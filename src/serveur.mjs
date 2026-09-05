@@ -72,6 +72,29 @@ async function enrichirLot(lignes) {
     return bilan;
 }
 
+/**
+ * Calcule et enregistre le vecteur d'une ligne.
+ *
+ * Appele juste apres une creation ou une recompletion : sans cela, la
+ * ligne resterait invisible au chatbot jusqu'a la prochaine indexation.
+ */
+async function indexerUne(id) {
+    const { data: l } = await db
+        .from('connaissances')
+        .select('id, nom, note_alex, resume, texte, etiquettes')
+        .eq('id', id)
+        .single();
+
+    if (!l) return;
+    const texte = texteRepresentatif(l);
+    if (!texte.trim()) return;
+
+    const [vecteur] = await vectoriserPassages([texte]);
+    await db.from('connaissances')
+        .update({ embedding: JSON.stringify(vecteur), indexe_le: new Date().toISOString() })
+        .eq('id', id);
+}
+
 /** Les lignes qui meritent un traitement : un nom, et au moins un champ vide. */
 async function lignesEnAttente() {
     const { data, error } = await db
@@ -206,6 +229,7 @@ const serveur = createServer(async (req, rep) => {
                     if (error) return json(rep, 500, { erreur: error.message });
 
                     const r = await traiterLigne(db, maj, redacteur);
+                    await indexerUne(id);
                     return json(rep, 200, { resultat: r.statut, message: r.message ?? null });
                 }
 
@@ -231,6 +255,7 @@ const serveur = createServer(async (req, rep) => {
                     if (error) return json(rep, 500, { erreur: error.message });
 
                     const r = await traiterLigne(db, creee, redacteur);
+                    await indexerUne(creee.id);
                     return json(rep, 200, { id: creee.id, resultat: r.statut, message: r.message ?? null });
                 }
             } finally {

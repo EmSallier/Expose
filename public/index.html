@@ -561,6 +561,42 @@
     border-color: color-mix(in srgb, var(--ambre) 30%, transparent);
   }
 
+  /* Une reponse venue du web ne doit jamais etre confondue avec le
+     contenu de la base : couleur differente et mention explicite. */
+  .bulle.robot.web {
+    background: var(--bleu-pale);
+    border-color: color-mix(in srgb, var(--bleu) 32%, transparent);
+  }
+  .origine {
+    font-size: 10.5px; text-transform: uppercase; letter-spacing: .07em;
+    font-weight: 700; margin-bottom: 7px;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .origine.web  { color: var(--bleu); }
+  .origine.base { color: var(--vert); }
+
+  .propositions { margin-top: 12px; padding-top: 10px; border-top: 1px dashed var(--trait); }
+  .propositions-titre {
+    font-size: 10.5px; text-transform: uppercase; letter-spacing: .07em;
+    color: var(--attenue); font-weight: 650; margin-bottom: 8px;
+  }
+  .proposition {
+    display: flex; gap: 9px; align-items: center;
+    padding: 9px 11px; margin-bottom: 7px;
+    background: var(--carte); border: 1px solid var(--trait); border-radius: 9px;
+  }
+  .proposition-texte { flex: 1; min-width: 0; font-size: 12.5px; line-height: 1.45; }
+  .proposition-texte strong { display: block; font-weight: 600; }
+  .proposition-texte a { color: var(--attenue); text-decoration: none; font-size: 11.5px; word-break: break-word; }
+  .proposition-texte a:hover { text-decoration: underline; }
+  .proposition button {
+    font: inherit; font-size: 12px; font-weight: 600;
+    padding: 7px 13px; border: none; border-radius: 8px;
+    background: var(--vert); color: #fff; cursor: pointer; white-space: nowrap;
+  }
+  .proposition button:disabled { opacity: .55; cursor: not-allowed; }
+  .proposition.ajoutee { border-color: var(--vert); background: var(--vert-pale); }
+
   .sources { margin-top: 11px; padding-top: 9px; border-top: 1px dashed var(--trait); }
   .sources-titre {
     font-size: 10.5px; text-transform: uppercase; letter-spacing: .07em;
@@ -1080,7 +1116,7 @@ function accueil() {
   corps.innerHTML = `
     <div class="bulle robot">
       ${indexees
-        ? `${indexees} lignes sont indexées et interrogeables. Pose ta question — je ne répondrai qu'à partir d'elles, et j'indiquerai systématiquement mes sources.`
+        ? `${indexees} lignes sont indexées et interrogeables. Je réponds d'abord à partir d'elles, en citant mes sources.\n\nSi ta base ne contient pas la réponse, je vais la chercher sur le web — et je te proposerai d'ajouter la page trouvée.`
         : `Aucune ligne n'est encore indexée. Ferme ce panneau et clique sur « Indexer pour le chatbot » d'abord.`}
     </div>
     ${indexees ? `<div class="exemples">${EXEMPLES.map(
@@ -1102,6 +1138,40 @@ function ajouterBulle(html, classe = 'robot') {
   corps.scrollTop = corps.scrollHeight;
   return d;
 }
+
+// Ajout d'une page proposee par le chatbot. Par delegation : les bulles
+// sont creees au fil de la conversation.
+corps.addEventListener('click', async (e) => {
+  const bouton = e.target.closest('[data-ajouter]');
+  if (!bouton) return;
+
+  const ligne = bouton.closest('.proposition');
+  bouton.disabled = true;
+  bouton.textContent = 'Ajout…';
+
+  try {
+    const rep = await fetch('/api/ligne', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ nom: bouton.dataset.nom, url: bouton.dataset.url }),
+    });
+    const data = await rep.json();
+    if (data.erreur) throw new Error(data.erreur);
+
+    ligne.classList.add('ajoutee');
+    bouton.textContent = data.resultat === 'enrichi' ? '✓ Ajoutée' : `✓ Ajoutée (${data.resultat})`;
+
+    // La ligne est deja indexee cote serveur : le chatbot la connait
+    // des la question suivante. On rafraichit la liste derriere le panneau.
+    await charger();
+    annoncer(`« ${bouton.dataset.nom} » ajoutée à la base et indexée.`);
+  } catch (err) {
+    bouton.disabled = false;
+    bouton.textContent = '＋ Ajouter';
+    ligne.querySelector('.proposition-texte').insertAdjacentHTML(
+      'beforeend', `<div style="color:var(--rose);font-size:11.5px">${echapper(err.message)}</div>`);
+  }
+});
 
 document.getElementById('btn-discussion').addEventListener('click', () => ouvrirDiscussion(true));
 document.getElementById('btn-fermer-discussion').addEventListener('click', () => ouvrirDiscussion(false));
@@ -1131,18 +1201,40 @@ document.getElementById('form-question').addEventListener('submit', async (e) =>
     const data = await rep.json();
     if (data.erreur) throw new Error(data.erreur);
 
+    const duWeb = data.origine === 'web';
+
     const sources = (data.sources ?? []).map((s) => `
       <div class="source-item">
         ${s.url
           ? `<a href="${echapper(s.url)}" target="_blank" rel="noopener">${echapper(s.nom || s.titre || s.url)}</a>`
           : echapper(s.nom ?? '')}
-        <span class="prox">· proximité ${Number(s.similarite).toFixed(2)}</span>
+        <span class="prox">· ${duWeb ? 'pertinence' : 'proximité'} ${Number(s.similarite).toFixed(2)}</span>
       </div>`).join('');
 
-    attente.className = `bulle robot${data.suffisant ? '' : ' insuffisant'}`;
-    attente.innerHTML = echapper(data.reponse) + (sources
-      ? `<div class="sources"><div class="sources-titre">Lignes utilisées</div>${sources}</div>`
-      : '');
+    const propositions = (data.propositions ?? []).map((p, i) => `
+      <div class="proposition" data-prop="${i}">
+        <div class="proposition-texte">
+          <strong>${echapper(p.nom || p.titre || '')}</strong>
+          <a href="${echapper(p.url)}" target="_blank" rel="noopener"
+             title="${echapper(p.url)}">${echapper(nomLisible(p.url))}</a>
+        </div>
+        <button data-ajouter="${i}"
+                data-nom="${echapper(p.nom || p.titre || '')}"
+                data-url="${echapper(p.url)}">＋ Ajouter</button>
+      </div>`).join('');
+
+    const banniere = duWeb
+      ? `<div class="origine web">🌐 Réponse trouvée sur le web — absente de ta base</div>`
+      : (data.origine === 'base'
+          ? `<div class="origine base">◆ Réponse issue de ta base</div>`
+          : '');
+
+    attente.className = `bulle robot${duWeb ? ' web' : (data.suffisant ? '' : ' insuffisant')}`;
+    attente.innerHTML =
+      banniere +
+      echapper(data.reponse) +
+      (sources ? `<div class="sources"><div class="sources-titre">${duWeb ? 'Pages web citées' : 'Lignes utilisées'}</div>${sources}</div>` : '') +
+      (propositions ? `<div class="propositions"><div class="propositions-titre">Ajouter à la base ?</div>${propositions}</div>` : '');
 
     historique.push({ role: 'user', contenu: question });
     historique.push({ role: 'assistant', contenu: data.reponse });

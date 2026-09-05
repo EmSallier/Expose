@@ -35,6 +35,24 @@ export async function rechercher(requete) {
     };
 }
 
+/**
+ * Renvoie plusieurs resultats de recherche, classes par pertinence.
+ * Utilise par le chatbot quand la base ne sait pas repondre : il faut
+ * alors plusieurs sources pour construire une reponse, pas seulement la
+ * meilleure.
+ */
+export async function rechercherPlusieurs(requete, nombre = 4) {
+    const data = await tavily('search', { query: requete, max_results: nombre });
+    return (data.results ?? [])
+        .filter((r) => r.score >= SEUIL_PERTINENCE && String(r.content ?? '').trim())
+        .map((r) => ({
+            url: r.url,
+            titre: r.title,
+            extrait: String(r.content ?? '').slice(0, EXTRAIT_MAX),
+            score: r.score,
+        }));
+}
+
 /** Lit le contenu reel d'une URL connue, pour ancrer le texte dans la bonne page. */
 export async function extraire(url) {
     const data = await tavily('extract', { urls: [url] });
