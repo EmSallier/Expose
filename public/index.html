@@ -439,7 +439,40 @@
 
   /* ---------- Changement d'adresse sur une carte ---------- */
 
-  .relance { margin-top: 12px; }
+  /* ---------- Suppression ---------- */
+
+  .zone-actions { margin-top: 12px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+
+  .btn-supprimer {
+    font: inherit; font-size: 12.5px; font-weight: 600;
+    padding: 7px 13px; border-radius: 8px;
+    border: 1px solid transparent;
+    background: transparent; color: var(--doux);
+    cursor: pointer; transition: all .13s;
+    margin-left: auto;
+  }
+  .btn-supprimer:hover { background: var(--rose-pale); color: var(--rose); }
+
+  .confirmation {
+    display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+    width: 100%;
+    margin-top: 10px; padding: 11px 13px;
+    background: var(--rose-pale);
+    border: 1px solid color-mix(in srgb, var(--rose) 32%, transparent);
+    border-radius: 9px;
+    font-size: 12.5px;
+    color: var(--rose);
+  }
+  .confirmation span { flex: 1; min-width: 190px; line-height: 1.45; }
+  .confirmation button {
+    font: inherit; font-size: 12.5px; font-weight: 650;
+    padding: 7px 14px; border-radius: 8px; border: none; cursor: pointer;
+  }
+  .confirmation .oui { background: var(--rose); color: #fff; }
+  .confirmation .non { background: var(--carte); color: var(--attenue); border: 1px solid var(--trait); }
+  .confirmation button:disabled { opacity: .55; cursor: not-allowed; }
+
+  .relance { margin-top: 12px; flex: 1; }
   .relance > summary {
     cursor: pointer;
     font-size: 12.5px;
@@ -889,7 +922,11 @@ function carte(l) {
       ${etiquettes ? `<div class="etiquettes">${etiquettes}</div>` : ''}
       ${note}${resume}${brut}${pied}
       ${rienDuTout ? '<div class="pied vide">Aucune information disponible pour cette ligne.</div>' : ''}
-      ${relance}
+      <div class="zone-actions">
+        ${relance}
+        <button class="btn-supprimer" data-supprimer="${l.id}"
+                data-nom="${echapper(l.nom ?? '(sans nom)')}">🗑 Supprimer</button>
+      </div>
     </article>`;
 }
 
@@ -1051,6 +1088,54 @@ document.getElementById('form-ajout').addEventListener('submit', async (e) => {
     document.getElementById('ajout-url').value = '';
     document.getElementById('form-ajout').hidden = true;
   } catch { /* message deja affiche */ }
+});
+
+// Suppression : confirmation en deux temps, dans la carte elle-meme.
+// Une boite de dialogue du navigateur se valide par reflexe ; ici il faut
+// lire le nom de la ligne avant de confirmer.
+document.getElementById('liste').addEventListener('click', (e) => {
+  const bouton = e.target.closest('[data-supprimer]');
+  if (!bouton) return;
+
+  const carte = bouton.closest('.carte');
+  if (carte.querySelector('.confirmation')) return; // deja demande
+
+  const id = bouton.dataset.supprimer;
+  const nom = bouton.dataset.nom;
+  bouton.style.visibility = 'hidden';
+
+  const zone = document.createElement('div');
+  zone.className = 'confirmation';
+  zone.innerHTML = `
+    <span>Supprimer <strong>${echapper(nom)}</strong> définitivement ?
+      Cette action est irréversible.</span>
+    <button class="oui">Supprimer</button>
+    <button class="non">Annuler</button>`;
+  carte.querySelector('.zone-actions').appendChild(zone);
+
+  zone.querySelector('.non').addEventListener('click', () => {
+    zone.remove();
+    bouton.style.visibility = '';
+  });
+
+  zone.querySelector('.oui').addEventListener('click', async (ev) => {
+    ev.target.disabled = true;
+    ev.target.textContent = 'Suppression…';
+    try {
+      const rep = await fetch('/api/ligne/supprimer', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id }),
+      });
+      const data = await rep.json();
+      if (data.erreur) throw new Error(data.erreur);
+
+      await charger();
+      annoncer(`« ${echapper(data.supprime)} » supprimée de la base.`);
+    } catch (err) {
+      zone.innerHTML = `<span>Échec : ${echapper(err.message)}</span>`;
+    }
+  });
 });
 
 // Relance ligne par ligne, par delegation : les cartes sont reconstruites

@@ -249,6 +249,27 @@ const serveur = createServer(async (req, rep) => {
                     return json(rep, 200, { bilan: await enrichirLot(lignes) });
                 }
 
+                // Suppression definitive d'une ligne
+                if (chemin === '/api/ligne/supprimer') {
+                    const { id } = await lireCorps(req);
+                    if (!id) return json(rep, 400, { erreur: 'id requis' });
+
+                    // On relit le nom avant de supprimer : apres, il n'y a
+                    // plus rien a nommer dans le message de retour.
+                    const { data: avant } = await db
+                        .from('connaissances')
+                        .select('nom')
+                        .eq('id', id)
+                        .single();
+
+                    if (!avant) return json(rep, 404, { erreur: 'ligne introuvable' });
+
+                    const { error } = await db.from('connaissances').delete().eq('id', id);
+                    if (error) return json(rep, 500, { erreur: error.message });
+
+                    return json(rep, 200, { supprime: avant.nom ?? '(sans nom)' });
+                }
+
                 // Nouvelle adresse sur une ligne existante
                 if (chemin === '/api/ligne/url') {
                     const { id, url } = await lireCorps(req);
