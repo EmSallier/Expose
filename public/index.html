@@ -484,6 +484,136 @@
   .relance-corps button:disabled { opacity: .55; cursor: not-allowed; }
   .relance-etat { font-size: 12.5px; margin-top: 7px; color: var(--attenue); }
 
+  /* ---------- Panneau de dialogue ---------- */
+
+  .voile {
+    position: fixed; inset: 0;
+    background: rgba(18,17,32,.45);
+    backdrop-filter: blur(2px);
+    z-index: 40;
+    opacity: 0;
+    transition: opacity .22s;
+  }
+  .voile[hidden] { display: none; }
+  .voile.visible { opacity: 1; }
+
+  .discussion {
+    position: fixed;
+    top: 0; right: 0; bottom: 0;
+    width: min(520px, 100%);
+    background: var(--carte);
+    border-left: 1px solid var(--trait);
+    box-shadow: -14px 0 44px rgba(18,17,32,.22);
+    z-index: 50;
+    display: flex;
+    flex-direction: column;
+    transform: translateX(100%);
+    transition: transform .26s cubic-bezier(.4,0,.2,1);
+  }
+  .discussion[hidden] { display: none; }
+  .discussion.ouverte { transform: translateX(0); }
+
+  .discussion-entete {
+    padding: 18px 22px;
+    background: linear-gradient(135deg, #6246ea, #a855f7);
+    color: #fff;
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  .discussion-entete h2 { margin: 0 0 3px; font-size: 17px; font-weight: 650; }
+  .discussion-entete p { margin: 0; font-size: 12.5px; opacity: .88; line-height: 1.45; }
+  .fermer {
+    font: inherit; font-size: 19px; line-height: 1;
+    background: rgba(255,255,255,.2); color: #fff;
+    border: none; border-radius: 8px;
+    width: 32px; height: 32px; cursor: pointer; flex-shrink: 0;
+  }
+  .fermer:hover { background: rgba(255,255,255,.34); }
+
+  .discussion-corps {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px 22px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .bulle { max-width: 90%; font-size: 14px; line-height: 1.62; }
+  .bulle.moi {
+    align-self: flex-end;
+    background: var(--violet);
+    color: #fff;
+    padding: 10px 15px;
+    border-radius: 15px 15px 4px 15px;
+  }
+  .bulle.robot {
+    align-self: flex-start;
+    background: var(--fond);
+    border: 1px solid var(--trait);
+    padding: 12px 15px;
+    border-radius: 15px 15px 15px 4px;
+    white-space: pre-wrap;
+  }
+  .bulle.robot.insuffisant {
+    background: var(--ambre-pale);
+    border-color: color-mix(in srgb, var(--ambre) 30%, transparent);
+  }
+
+  .sources { margin-top: 11px; padding-top: 9px; border-top: 1px dashed var(--trait); }
+  .sources-titre {
+    font-size: 10.5px; text-transform: uppercase; letter-spacing: .07em;
+    color: var(--attenue); font-weight: 650; margin-bottom: 6px;
+  }
+  .source-item { font-size: 12.5px; margin-bottom: 4px; }
+  .source-item a { color: var(--violet); text-decoration: none; font-weight: 550; }
+  .source-item a:hover { text-decoration: underline; }
+  .source-item .prox { color: var(--doux); font-size: 11.5px; }
+
+  .exemples { display: flex; flex-direction: column; gap: 7px; }
+  .exemple {
+    font: inherit; font-size: 13px; text-align: left;
+    padding: 10px 14px; border-radius: 10px;
+    border: 1px solid var(--trait); background: var(--fond);
+    color: var(--attenue); cursor: pointer; transition: all .13s;
+  }
+  .exemple:hover { border-color: var(--violet); color: var(--violet); }
+
+  .discussion-pied {
+    padding: 14px 18px;
+    border-top: 1px solid var(--trait);
+    display: flex; gap: 9px;
+  }
+  .discussion-pied input {
+    font: inherit; font-size: 14px;
+    flex: 1; min-width: 0;
+    padding: 11px 15px;
+    border: 1.5px solid var(--trait);
+    border-radius: 11px;
+    background: var(--fond);
+    color: var(--texte);
+  }
+  .discussion-pied input:focus {
+    outline: none; border-color: var(--violet);
+    box-shadow: 0 0 0 3px var(--violet-pale);
+  }
+  .discussion-pied button {
+    font: inherit; font-size: 14px; font-weight: 600;
+    padding: 11px 19px; border: none; border-radius: 11px;
+    background: var(--violet); color: #fff; cursor: pointer;
+  }
+  .discussion-pied button:disabled { opacity: .5; cursor: not-allowed; }
+
+  .points span {
+    display: inline-block; width: 6px; height: 6px; margin-right: 4px;
+    border-radius: 99px; background: var(--doux);
+    animation: rebond 1.1s infinite;
+  }
+  .points span:nth-child(2) { animation-delay: .16s; }
+  .points span:nth-child(3) { animation-delay: .32s; }
+  @keyframes rebond { 0%,60%,100% { opacity: .3; } 30% { opacity: 1; } }
+
   @media (max-width: 720px) {
     .bandeau, .controles, main { padding-left: 18px; padding-right: 18px; }
     .champ-recherche { margin-left: 0; width: 100%; }
@@ -513,6 +643,12 @@
       </button>
       <button class="bouton secondaire" id="btn-ajouter">
         ＋ Ajouter une adresse
+      </button>
+      <button class="bouton secondaire" id="btn-indexer">
+        ⬡ Indexer pour le chatbot
+      </button>
+      <button class="bouton principal" id="btn-discussion">
+        💬 Interroger la base
       </button>
       <button class="bouton secondaire" id="btn-recharger">
         ⟲ Recharger
@@ -551,6 +687,28 @@
 </div>
 
 <main id="liste"><div class="message"><div class="grand">⏳</div>Chargement des données…</div></main>
+
+<div class="voile" id="voile" hidden></div>
+
+<aside class="discussion" id="discussion" hidden>
+  <div class="discussion-entete">
+    <div style="flex:1">
+      <h2>Interroger la base</h2>
+      <p>
+        La question est convertie en vecteur, les lignes les plus proches sont
+        récupérées, et la réponse ne s'appuie que sur elles.
+      </p>
+    </div>
+    <button class="fermer" id="btn-fermer-discussion" aria-label="Fermer">✕</button>
+  </div>
+
+  <div class="discussion-corps" id="discussion-corps"></div>
+
+  <form class="discussion-pied" id="form-question">
+    <input id="champ-question" placeholder="Ta question…" autocomplete="off">
+    <button type="submit" id="btn-envoyer">Envoyer</button>
+  </form>
+</aside>
 
 <script>
 const LIBELLES = {
@@ -762,7 +920,8 @@ function annoncer(texte, estErreur = false) {
   zoneAvancement.innerHTML = texte;
 }
 
-const boutons = ['btn-enrichir', 'btn-reessayer', 'btn-ajouter', 'btn-recharger', 'btn-valider-ajout']
+const boutons = ['btn-enrichir', 'btn-reessayer', 'btn-ajouter', 'btn-recharger',
+                 'btn-valider-ajout', 'btn-indexer']
   .map((id) => document.getElementById(id));
 
 function verrouiller(actif) {
@@ -878,6 +1037,123 @@ document.getElementById('liste').addEventListener('click', async (e) => {
   try {
     await agir('/api/ligne/url', { id, url }, 'Complétion depuis la nouvelle adresse');
   } catch { /* message deja affiche dans le bandeau */ }
+});
+
+document.getElementById('btn-indexer').addEventListener('click', () =>
+  agir('/api/indexer', {}, 'Calcul des vecteurs sémantiques').catch(() => {}));
+
+// ---------- Panneau de dialogue ----------
+
+const panneau = document.getElementById('discussion');
+const voile = document.getElementById('voile');
+const corps = document.getElementById('discussion-corps');
+const champQuestion = document.getElementById('champ-question');
+const btnEnvoyer = document.getElementById('btn-envoyer');
+
+let historique = [];
+
+const EXEMPLES = [
+  'Quels artistes travaillent sur la surveillance ou la biométrie ?',
+  'Qu\'est-ce que je sais sur les profilés aluminium ?',
+  'Quels outils logiciels pour l\'animation procédurale ?',
+];
+
+function ouvrirDiscussion(ouvrir) {
+  if (ouvrir) {
+    voile.hidden = false;
+    panneau.hidden = false;
+    requestAnimationFrame(() => {
+      voile.classList.add('visible');
+      panneau.classList.add('ouverte');
+    });
+    if (!historique.length) accueil();
+    champQuestion.focus();
+  } else {
+    voile.classList.remove('visible');
+    panneau.classList.remove('ouverte');
+    setTimeout(() => { voile.hidden = true; panneau.hidden = true; }, 260);
+  }
+}
+
+function accueil() {
+  const indexees = lignes.filter((l) => l.indexe_le).length;
+  corps.innerHTML = `
+    <div class="bulle robot">
+      ${indexees
+        ? `${indexees} lignes sont indexées et interrogeables. Pose ta question — je ne répondrai qu'à partir d'elles, et j'indiquerai systématiquement mes sources.`
+        : `Aucune ligne n'est encore indexée. Ferme ce panneau et clique sur « Indexer pour le chatbot » d'abord.`}
+    </div>
+    ${indexees ? `<div class="exemples">${EXEMPLES.map(
+      (e) => `<button class="exemple">${echapper(e)}</button>`).join('')}</div>` : ''}`;
+
+  corps.querySelectorAll('.exemple').forEach((b) => {
+    b.addEventListener('click', () => {
+      champQuestion.value = b.textContent;
+      document.getElementById('form-question').requestSubmit();
+    });
+  });
+}
+
+function ajouterBulle(html, classe = 'robot') {
+  const d = document.createElement('div');
+  d.className = `bulle ${classe}`;
+  d.innerHTML = html;
+  corps.appendChild(d);
+  corps.scrollTop = corps.scrollHeight;
+  return d;
+}
+
+document.getElementById('btn-discussion').addEventListener('click', () => ouvrirDiscussion(true));
+document.getElementById('btn-fermer-discussion').addEventListener('click', () => ouvrirDiscussion(false));
+voile.addEventListener('click', () => ouvrirDiscussion(false));
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && !panneau.hidden) ouvrirDiscussion(false);
+});
+
+document.getElementById('form-question').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const question = champQuestion.value.trim();
+  if (!question) return;
+
+  corps.querySelector('.exemples')?.remove();
+  ajouterBulle(echapper(question), 'moi');
+  champQuestion.value = '';
+  champQuestion.disabled = btnEnvoyer.disabled = true;
+
+  const attente = ajouterBulle('<span class="points"><span></span><span></span><span></span></span>');
+
+  try {
+    const rep = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ question, historique }),
+    });
+    const data = await rep.json();
+    if (data.erreur) throw new Error(data.erreur);
+
+    const sources = (data.sources ?? []).map((s) => `
+      <div class="source-item">
+        ${s.url
+          ? `<a href="${echapper(s.url)}" target="_blank" rel="noopener">${echapper(s.nom || s.titre || s.url)}</a>`
+          : echapper(s.nom ?? '')}
+        <span class="prox">· proximité ${Number(s.similarite).toFixed(2)}</span>
+      </div>`).join('');
+
+    attente.className = `bulle robot${data.suffisant ? '' : ' insuffisant'}`;
+    attente.innerHTML = echapper(data.reponse) + (sources
+      ? `<div class="sources"><div class="sources-titre">Lignes utilisées</div>${sources}</div>`
+      : '');
+
+    historique.push({ role: 'user', contenu: question });
+    historique.push({ role: 'assistant', contenu: data.reponse });
+  } catch (err) {
+    attente.className = 'bulle robot insuffisant';
+    attente.textContent = `Échec : ${err.message}`;
+  } finally {
+    champQuestion.disabled = btnEnvoyer.disabled = false;
+    champQuestion.focus();
+    corps.scrollTop = corps.scrollHeight;
+  }
 });
 
 charger().catch((e) => {

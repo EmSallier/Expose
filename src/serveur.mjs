@@ -15,6 +15,8 @@ import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { createClient } from '@supabase/supabase-js';
 import { creerRedacteur, traiterLigne } from './enrichissement.mjs';
+import { repondre } from './chat.mjs';
+import { vectoriserPassages, texteRepresentatif, prechauffer } from './vecteurs.mjs';
 
 const PORT = Number(process.env.PORT) || 3000;
 const PAUSE_MS = 350;
@@ -50,7 +52,7 @@ async function lireCorps(req) {
 
 const CHAMPS = 'id, nom, note_alex, texte, resume, url, etiquettes, statut, ' +
     'source_url, source_titre, source_extrait, moteur, resume_modele, ' +
-    'pertinence, champs_enrichis, enrichi_le, erreur';
+    'pertinence, champs_enrichis, enrichi_le, erreur, indexe_le';
 
 /** Traite une liste de lignes et renvoie le bilan. */
 async function enrichirLot(lignes) {
@@ -101,6 +103,22 @@ const serveur = createServer(async (req, rep) => {
             return json(rep, 200, data);
         }
 
+        // ---- Chatbot ----
+        // Hors du verrou d'ecriture : poser une question n'ecrit rien et
+        // ne doit pas attendre la fin d'un enrichissement en cours.
+        if (req.method === 'POST' && chemin === '/api/chat') {
+            const { question, historique } = await lireCorps(req);
+            if (!String(question ?? '').trim()) {
+                return json(rep, 400, { erreur: 'question vide' });
+            }
+            try {
+                const r = await repondre(db, String(question).trim(), historique ?? []);
+                return json(rep, 200, r);
+            } catch (e) {
+                return json(rep, 500, { erreur: e.message });
+            }
+        }
+
         // ---- Ecritures : une seule a la fois ----
         if (req.method === 'POST') {
             if (enCours) {
@@ -118,6 +136,37 @@ const serveur = createServer(async (req, rep) => {
                         });
                     }
                     return json(rep, 200, { bilan: await enrichirLot(lignes) });
+                }
+
+                // Indexer les lignes que le chatbot ne voit pas encore
+                if (chemin === '/api/indexer') {
+                    const { data, error } = await db
+                        .from('connaissances')
+                        .select('id, nom, note_alex, resume, texte, etiquettes, embedding');
+                    if (error) return json(rep, 500, { erreur: error.message });
+
+                    const aFaire = data.filter(
+                        (l) => !l.embedding && texteRepresentatif(l).trim()
+                    );
+                    if (!aFaire.length) {
+                        return json(rep, 200, { message: 'Toutes les lignes exploitables sont deja indexees.' });
+                    }
+
+                    for (let i = 0; i < aFaire.length; i += 16) {
+                        const lot = aFaire.slice(i, i + 16);
+                        const vecteurs = await vectoriserPassages(lot.map(texteRepresentatif));
+                        for (const [j, l] of lot.entries()) {
+                            await db.from('connaissances')
+                                .update({
+                                    embedding: JSON.stringify(vecteurs[j]),
+                                    indexe_le: new Date().toISOString(),
+                                })
+                                .eq('id', l.id);
+                        }
+                    }
+                    return json(rep, 200, {
+                        message: `${aFaire.length} ligne${aFaire.length > 1 ? 's' : ''} indexee${aFaire.length > 1 ? 's' : ''}.`,
+                    });
                 }
 
                 // Remettre les 'sans source' en attente, puis reessayer
@@ -196,8 +245,18 @@ const serveur = createServer(async (req, rep) => {
     }
 });
 
-serveur.listen(PORT, () => {
+serveur.listen(PORT, async () => {
     console.log(`\n  Base de connaissance consultable sur http://localhost:${PORT}`);
     console.log(`  Reformulation : ${redacteur?.modele ?? 'desactivee (pas de cle Anthropic)'}`);
     console.log('  Ctrl+C pour arreter.\n');
+
+    // Le modele de vecteurs met ~25 s a se charger la premiere fois. On
+    // absorbe cette attente maintenant plutot qu'a la premiere question.
+    console.log('  Chargement du modele de vecteurs en arriere-plan...');
+    try {
+        await prechauffer();
+        console.log('  Modele de vecteurs pret : le chatbot peut repondre.\n');
+    } catch (e) {
+        console.log(`  Modele de vecteurs indisponible : ${e.message}\n`);
+    }
 });

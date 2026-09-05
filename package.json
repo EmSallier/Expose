@@ -8,13 +8,15 @@
     "verifier": "node src/verifier.mjs",
     "importer": "node src/importer.mjs",
     "enrichir": "node src/enrichir.mjs",
-    "site": "node src/serveur.mjs"
+    "site": "node src/serveur.mjs",
+    "indexer": "node src/indexer.mjs"
   },
   "engines": {
     "node": ">=20"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.124.0",
+    "@huggingface/transformers": "^4.2.0",
     "@supabase/supabase-js": "^2.115.0",
     "csv-parse": "^7.0.2",
     "dotenv": "^17.4.2",
