@@ -34,8 +34,28 @@ const pause = (ms) => new Promise((r) => setTimeout(r, ms));
 // marcheraient dessus et consommeraient du credit API pour rien.
 let enCours = false;
 
+/**
+ * Autorisation d'origine croisee, volontairement etroite.
+ *
+ * Seules les extensions Chrome sont admises. Ouvrir a toutes les origines
+ * laisserait n'importe quel site visite envoyer des requetes a ce serveur,
+ * qui detient la cle d'ecriture de la base.
+ */
+function entetesCors(origine) {
+    if (!origine || !origine.startsWith('chrome-extension://')) return {};
+    return {
+        'Access-Control-Allow-Origin': origine,
+        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type',
+        'Access-Control-Max-Age': '86400',
+    };
+}
+
 const json = (rep, code, corps) => {
-    rep.writeHead(code, { 'Content-Type': 'application/json; charset=utf-8' });
+    rep.writeHead(code, {
+        'Content-Type': 'application/json; charset=utf-8',
+        ...entetesCors(rep._origine),
+    });
     rep.end(JSON.stringify(corps));
 };
 
@@ -106,9 +126,34 @@ async function lignesEnAttente() {
 }
 
 const serveur = createServer(async (req, rep) => {
-    const chemin = new URL(req.url, `http://${req.headers.host}`).pathname;
+    const adresse = new URL(req.url, `http://${req.headers.host}`);
+    const chemin = adresse.pathname;
+    rep._origine = req.headers.origin;
 
     try {
+        // Requete preliminaire envoyee par le navigateur avant un POST
+        // depuis l'extension.
+        if (req.method === 'OPTIONS') {
+            rep.writeHead(204, entetesCors(rep._origine));
+            return rep.end();
+        }
+
+        // L'extension verifie si la page consultee est deja connue, pour
+        // eviter les doublons et le signaler avant l'ajout.
+        if (req.method === 'GET' && chemin === '/api/existe') {
+            const url = adresse.searchParams.get('url');
+            if (!url) return json(rep, 400, { erreur: 'parametre url requis' });
+
+            const { data, error } = await db
+                .from('connaissances')
+                .select('id, nom, statut, resume')
+                .or(`url.eq.${url},source_url.eq.${url}`)
+                .limit(1);
+
+            if (error) return json(rep, 500, { erreur: error.message });
+            return json(rep, 200, { existe: Boolean(data?.length), ligne: data?.[0] ?? null });
+        }
+
         // ---- Page ----
         if (req.method === 'GET' && (chemin === '/' || chemin === '/index.html')) {
             const html = await readFile('public/index.html', 'utf8');
@@ -235,7 +280,7 @@ const serveur = createServer(async (req, rep) => {
 
                 // Creation d'une ligne, puis completion immediate
                 if (chemin === '/api/ligne') {
-                    const { nom, url, etiquettes } = await lireCorps(req);
+                    const { nom, url, etiquettes, note } = await lireCorps(req);
                     const intitule = String(nom ?? '').trim() || String(url ?? '').trim();
                     if (!intitule) return json(rep, 400, { erreur: 'un nom ou une adresse est requis' });
                     if (url && !/^https?:\/\//i.test(url)) {
@@ -247,6 +292,9 @@ const serveur = createServer(async (req, rep) => {
                         .insert({
                             nom: intitule,
                             url: url || null,
+                            // La note vient de l'humain : elle a sa place dans
+                            // note_alex, que l'enrichissement ne touche jamais.
+                            note_alex: String(note ?? '').trim() || null,
                             etiquettes: Array.isArray(etiquettes) ? etiquettes : [],
                             statut: 'en_attente',
                         })

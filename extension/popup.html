@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<style>
+  :root {
+    --violet: #6246ea;
+    --violet-pale: #efecff;
+    --vert: #0f9d6e;
+    --vert-pale: #e3f7ef;
+    --ambre: #c77a10;
+    --ambre-pale: #fdf2dd;
+    --rose: #d63b5e;
+    --rose-pale: #fdeaef;
+    --trait: #e5e6f0;
+    --texte: #1c1b2e;
+    --attenue: #6b6a86;
+    --fond: #f4f5fb;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    width: 370px;
+    margin: 0;
+    font: 13.5px/1.55 "Segoe UI", system-ui, sans-serif;
+    color: var(--texte);
+    background: #fff;
+  }
+
+  header {
+    background: linear-gradient(135deg, #6246ea, #a855f7);
+    color: #fff;
+    padding: 13px 16px;
+  }
+  header h1 { margin: 0; font-size: 14.5px; font-weight: 650; }
+  header p { margin: 2px 0 0; font-size: 11.5px; opacity: .85; }
+
+  main { padding: 14px 16px 16px; }
+
+  label {
+    display: block;
+    font-size: 10.5px;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    font-weight: 650;
+    color: var(--attenue);
+    margin: 0 0 4px;
+  }
+  .groupe { margin-bottom: 12px; }
+
+  input, textarea {
+    font: inherit;
+    width: 100%;
+    padding: 8px 11px;
+    border: 1.5px solid var(--trait);
+    border-radius: 8px;
+    background: var(--fond);
+    color: var(--texte);
+    resize: vertical;
+  }
+  input:focus, textarea:focus {
+    outline: none;
+    border-color: var(--violet);
+    background: #fff;
+    box-shadow: 0 0 0 3px var(--violet-pale);
+  }
+  textarea { min-height: 58px; }
+
+  .adresse {
+    font-size: 11.5px;
+    color: var(--attenue);
+    background: var(--fond);
+    border: 1px solid var(--trait);
+    border-radius: 8px;
+    padding: 7px 10px;
+    word-break: break-word;
+    max-height: 52px;
+    overflow-y: auto;
+  }
+
+  button {
+    font: inherit;
+    font-size: 13.5px;
+    font-weight: 650;
+    width: 100%;
+    padding: 10px;
+    border: none;
+    border-radius: 9px;
+    background: var(--violet);
+    color: #fff;
+    cursor: pointer;
+    transition: filter .13s;
+  }
+  button:hover:not(:disabled) { filter: brightness(1.08); }
+  button:disabled { opacity: .55; cursor: not-allowed; }
+
+  .etat {
+    margin-top: 11px;
+    font-size: 12.5px;
+    padding: 9px 12px;
+    border-radius: 8px;
+    line-height: 1.5;
+  }
+  .etat[hidden] { display: none; }
+  .etat.info    { background: var(--violet-pale); color: var(--violet); }
+  .etat.succes  { background: var(--vert-pale);   color: var(--vert); }
+  .etat.avertir { background: var(--ambre-pale);  color: var(--ambre); }
+  .etat.erreur  { background: var(--rose-pale);   color: var(--rose); }
+  .etat a { color: inherit; font-weight: 600; }
+
+  .astuce { margin-top: 10px; font-size: 11px; color: var(--attenue); line-height: 1.45; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Ajouter à la base</h1>
+  <p>La page sera lue, résumée et indexée.</p>
+</header>
+
+<main>
+  <div class="groupe">
+    <label for="nom">Nom</label>
+    <input id="nom" placeholder="Intitulé du sujet">
+  </div>
+
+  <div class="groupe">
+    <label>Adresse</label>
+    <div class="adresse" id="adresse">…</div>
+  </div>
+
+  <div class="groupe">
+    <label for="etiquettes">Étiquettes <span style="text-transform:none;font-weight:400">— séparées par des virgules</span></label>
+    <input id="etiquettes" placeholder="ai, tuto, Matériel">
+  </div>
+
+  <div class="groupe">
+    <label for="note">Ta note <span style="text-transform:none;font-weight:400">— pourquoi cette page compte</span></label>
+    <textarea id="note" placeholder="Facultatif. Cette note ne sera jamais modifiée par la machine."></textarea>
+  </div>
+
+  <button id="envoyer" disabled>Ajouter à la base</button>
+
+  <div class="etat" id="etat" hidden></div>
+
+  <div class="astuce">Raccourci : Ctrl+Maj+K sur n'importe quelle page.</div>
+</main>
+
+<script src="popup.js"></script>
+</body>
+</html>
