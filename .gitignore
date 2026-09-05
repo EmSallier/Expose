@@ -13,3 +13,8 @@ $RECYCLE.BIN/
 node_modules/
 .venv/
 __pycache__/
+
+# Secrets - ne jamais versionner
+.env
+.env.local
+*.key
