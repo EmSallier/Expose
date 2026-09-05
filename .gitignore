@@ -1,0 +1,15 @@
+# Windows / OneDrive
+Thumbs.db
+desktop.ini
+ehthumbs.db
+$RECYCLE.BIN/
+*.lnk
+
+# Fichiers temporaires Office
+~$*
+*.tmp
+
+# Environnements / dépendances
+node_modules/
+.venv/
+__pycache__/
