@@ -1,0 +1,319 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Base de connaissance</title>
+<style>
+  :root {
+    --fond:        #f7f6f3;
+    --carte:       #ffffff;
+    --trait:       #e3e0d9;
+    --texte:       #23211d;
+    --attenue:     #6f6a61;
+    --accent:      #2f6f4f;
+    --brut:        #8a5a2b;
+    --alerte:      #9a3b2f;
+    --neutre:      #6f6a61;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--fond);
+    color: var(--texte);
+    font: 15px/1.6 "Segoe UI", system-ui, -apple-system, sans-serif;
+  }
+
+  header {
+    background: var(--carte);
+    border-bottom: 1px solid var(--trait);
+    padding: 22px 32px;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+
+  h1 { margin: 0 0 4px; font-size: 20px; font-weight: 650; letter-spacing: -0.01em; }
+  .sous-titre { color: var(--attenue); font-size: 13px; margin-bottom: 18px; }
+
+  .stats { display: flex; gap: 26px; flex-wrap: wrap; margin-bottom: 18px; }
+  .stat .chiffre { font-size: 26px; font-weight: 650; line-height: 1.1; }
+  .stat .libelle { font-size: 11px; color: var(--attenue); text-transform: uppercase; letter-spacing: 0.06em; }
+
+  .controles { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+
+  button {
+    font: inherit;
+    font-size: 13px;
+    padding: 6px 14px;
+    border: 1px solid var(--trait);
+    border-radius: 999px;
+    background: var(--carte);
+    color: var(--attenue);
+    cursor: pointer;
+    transition: all .12s;
+  }
+  button:hover { border-color: var(--attenue); color: var(--texte); }
+  button.actif { background: var(--texte); border-color: var(--texte); color: var(--carte); }
+
+  input[type=search] {
+    font: inherit;
+    font-size: 13px;
+    padding: 7px 13px;
+    border: 1px solid var(--trait);
+    border-radius: 8px;
+    background: var(--carte);
+    color: var(--texte);
+    min-width: 260px;
+  }
+  input[type=search]:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+
+  main { padding: 26px 32px 60px; max-width: 1180px; }
+
+  .carte {
+    background: var(--carte);
+    border: 1px solid var(--trait);
+    border-radius: 10px;
+    padding: 18px 20px;
+    margin-bottom: 14px;
+  }
+
+  .entete { display: flex; gap: 12px; align-items: baseline; flex-wrap: wrap; margin-bottom: 10px; }
+  .nom { font-weight: 620; font-size: 15.5px; flex: 1; min-width: 240px; }
+
+  .badge {
+    font-size: 10.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    padding: 3px 9px;
+    border-radius: 999px;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .badge.enrichi     { background: #e6f0ea; color: var(--accent); }
+  .badge.non_trouve  { background: #f2ece4; color: var(--brut); }
+  .badge.echec       { background: #f7e7e4; color: var(--alerte); }
+  .badge.en_attente  { background: #eeece8; color: var(--neutre); }
+
+  .etiquettes { display: flex; gap: 5px; flex-wrap: wrap; }
+  .etiquette {
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 4px;
+    background: var(--fond);
+    color: var(--attenue);
+    border: 1px solid var(--trait);
+  }
+
+  .duo { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 12px; }
+  @media (max-width: 820px) { .duo { grid-template-columns: 1fr; } }
+
+  .colonne { min-width: 0; }
+  .colonne h3 {
+    margin: 0 0 6px;
+    font-size: 10.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: var(--attenue);
+    font-weight: 650;
+  }
+  .colonne.source h3 { color: var(--brut); }
+  .colonne.redige h3 { color: var(--accent); }
+
+  .contenu {
+    font-size: 13.5px;
+    line-height: 1.62;
+    max-height: 190px;
+    overflow-y: auto;
+    padding: 11px 13px;
+    border-radius: 7px;
+    background: var(--fond);
+    border-left: 3px solid var(--trait);
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+  .colonne.source .contenu { border-left-color: var(--brut); font-family: ui-monospace, "Cascadia Code", Consolas, monospace; font-size: 12px; }
+  .colonne.redige .contenu { border-left-color: var(--accent); }
+
+  .pied {
+    margin-top: 12px;
+    padding-top: 10px;
+    border-top: 1px solid var(--trait);
+    font-size: 12px;
+    color: var(--attenue);
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  .pied a { color: var(--accent); text-decoration: none; word-break: break-all; }
+  .pied a:hover { text-decoration: underline; }
+
+  .note-humaine {
+    margin-top: 10px;
+    font-size: 13px;
+    padding: 9px 12px;
+    background: #fdf8ee;
+    border: 1px solid #eadfc8;
+    border-radius: 7px;
+  }
+  .note-humaine strong { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--brut); display: block; margin-bottom: 3px; }
+
+  .vide { color: var(--attenue); font-style: italic; font-size: 13px; }
+  .message { padding: 40px; text-align: center; color: var(--attenue); }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Base de connaissance</h1>
+  <div class="sous-titre">
+    Champs vides complétés par recherche web réelle &middot; chaque ajout renvoie à sa source
+  </div>
+
+  <div class="stats" id="stats"></div>
+
+  <div class="controles">
+    <button data-filtre="tous" class="actif">Tout</button>
+    <button data-filtre="enrichi">Enrichies</button>
+    <button data-filtre="non_trouve">Sans source</button>
+    <button data-filtre="en_attente">En attente</button>
+    <button data-filtre="echec">Échecs</button>
+    <input type="search" id="recherche" placeholder="Rechercher un nom, un texte, une étiquette…">
+  </div>
+</header>
+
+<main id="liste"><div class="message">Chargement…</div></main>
+
+<script>
+const LIBELLES = {
+  enrichi:    'enrichi',
+  non_trouve: 'sans source',
+  echec:      'échec',
+  en_attente: 'en attente',
+};
+
+let lignes = [];
+let filtre = 'tous';
+let requete = '';
+
+const echapper = (s) => String(s ?? '').replace(/[&<>"]/g,
+  (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+function afficherStats() {
+  const parStatut = lignes.reduce((acc, l) => {
+    acc[l.statut] = (acc[l.statut] ?? 0) + 1;
+    return acc;
+  }, {});
+
+  const champs = lignes.reduce((n, l) => n + (l.champs_enrichis?.length ?? 0), 0);
+
+  const blocs = [
+    ['Lignes', lignes.length],
+    ['Enrichies', parStatut.enrichi ?? 0],
+    ['Sans source', parStatut.non_trouve ?? 0],
+    ['Champs complétés', champs],
+  ];
+
+  document.getElementById('stats').innerHTML = blocs.map(([libelle, chiffre]) =>
+    `<div class="stat"><div class="chiffre">${chiffre}</div><div class="libelle">${libelle}</div></div>`
+  ).join('');
+}
+
+function carte(l) {
+  const etiquettes = (l.etiquettes ?? []).map(
+    (e) => `<span class="etiquette">${echapper(e)}</span>`).join('');
+
+  const aDuContenu = l.texte || l.resume;
+
+  const duo = aDuContenu ? `
+    <div class="duo">
+      <div class="colonne source">
+        <h3>Texte source &mdash; brut, non reformulé</h3>
+        <div class="contenu">${l.texte ? echapper(l.texte) : '<span class="vide">vide</span>'}</div>
+      </div>
+      <div class="colonne redige">
+        <h3>Résumé &mdash; reformulé par ${echapper(l.resume_modele ?? 'le modèle')}</h3>
+        <div class="contenu">${l.resume ? echapper(l.resume) : '<span class="vide">pas de reformulation</span>'}</div>
+      </div>
+    </div>` : '';
+
+  const note = l.note_alex ? `
+    <div class="note-humaine">
+      <strong>Note humaine &mdash; saisie manuellement, jamais modifiée</strong>
+      ${echapper(l.note_alex)}
+    </div>` : '';
+
+  const pieces = [];
+  if (l.source_url) {
+    pieces.push(`Source : <a href="${echapper(l.source_url)}" target="_blank" rel="noopener">${echapper(l.source_titre || l.source_url)}</a>`);
+  } else if (l.url) {
+    pieces.push(`Lien : <a href="${echapper(l.url)}" target="_blank" rel="noopener">${echapper(l.url)}</a>`);
+  }
+  if (l.moteur) pieces.push(`Moteur : ${echapper(l.moteur)}`);
+  if (l.pertinence != null) pieces.push(`Pertinence : ${Number(l.pertinence).toFixed(2)}`);
+  if (l.champs_enrichis?.length) pieces.push(`Complété : ${l.champs_enrichis.join(', ')}`);
+  if (l.erreur) pieces.push(`<span style="color:var(--alerte)">${echapper(l.erreur)}</span>`);
+
+  const pied = pieces.length ? `<div class="pied">${pieces.join('<span>&middot;</span>')}</div>` : '';
+
+  return `
+    <article class="carte">
+      <div class="entete">
+        <div class="nom">${echapper(l.nom || '(sans nom)')}</div>
+        <div class="etiquettes">${etiquettes}</div>
+        <span class="badge ${l.statut}">${LIBELLES[l.statut] ?? l.statut}</span>
+      </div>
+      ${note}
+      ${duo}
+      ${pied}
+    </article>`;
+}
+
+function rendre() {
+  const q = requete.trim().toLowerCase();
+
+  const visibles = lignes.filter((l) => {
+    if (filtre !== 'tous' && l.statut !== filtre) return false;
+    if (!q) return true;
+    const foin = [l.nom, l.texte, l.resume, l.note_alex, (l.etiquettes ?? []).join(' ')]
+      .join(' ').toLowerCase();
+    return foin.includes(q);
+  });
+
+  document.getElementById('liste').innerHTML = visibles.length
+    ? visibles.map(carte).join('')
+    : '<div class="message">Aucune ligne ne correspond.</div>';
+}
+
+document.querySelectorAll('button[data-filtre]').forEach((b) => {
+  b.addEventListener('click', () => {
+    document.querySelectorAll('button[data-filtre]').forEach((x) => x.classList.remove('actif'));
+    b.classList.add('actif');
+    filtre = b.dataset.filtre;
+    rendre();
+  });
+});
+
+document.getElementById('recherche').addEventListener('input', (e) => {
+  requete = e.target.value;
+  rendre();
+});
+
+fetch('/api/lignes')
+  .then((r) => r.json())
+  .then((data) => {
+    if (data.erreur) throw new Error(data.erreur);
+    lignes = data;
+    afficherStats();
+    rendre();
+  })
+  .catch((e) => {
+    document.getElementById('liste').innerHTML =
+      `<div class="message">Chargement impossible : ${echapper(e.message)}</div>`;
+  });
+</script>
+</body>
+</html>

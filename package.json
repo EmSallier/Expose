@@ -7,7 +7,8 @@
   "scripts": {
     "verifier": "node src/verifier.mjs",
     "importer": "node src/importer.mjs",
-    "enrichir": "node src/enrichir.mjs"
+    "enrichir": "node src/enrichir.mjs",
+    "site": "node src/serveur.mjs"
   },
   "engines": {
     "node": ">=20"
