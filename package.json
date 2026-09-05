@@ -9,7 +9,8 @@
     "importer": "node src/importer.mjs",
     "enrichir": "node src/enrichir.mjs",
     "site": "node src/serveur.mjs",
-    "indexer": "node src/indexer.mjs"
+    "indexer": "node src/indexer.mjs",
+    "maquette": "node outils/construire-maquette.mjs"
   },
   "engines": {
     "node": ">=20"

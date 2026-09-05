@@ -1,0 +1,1555 @@
+<!-- ================================================================
+     MAQUETTE de l'interface "Base de connaissance".
+
+     Fichier autonome : aucune dependance, aucun serveur, aucun appel
+     reseau. Les donnees sont figees dans le bloc DONNEES_MAQUETTE.
+
+     Etats a preserver lors d'une refonte :
+       - carte enrichie : note humaine, resume, source brute repliee
+       - carte sans source (ambre) et carte en echec (rose)
+       - panneau de dialogue : reponse base (vert) vs web (bleu)
+       - propositions d'ajout, dont une deja ajoutee
+       - theme sombre (media prefers-color-scheme)
+
+     Regenerer avec : node outils/construire-maquette.mjs
+     ================================================================ -->
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Base de connaissance</title>
+<style>
+  :root {
+    --fond:       #f4f5fb;
+    --carte:      #ffffff;
+    --trait:      #e5e6f0;
+    --texte:      #1c1b2e;
+    --attenue:    #6b6a86;
+    --doux:       #9998b3;
+
+    --violet:     #6246ea;
+    --violet-pale:#efecff;
+    --vert:       #0f9d6e;
+    --vert-pale:  #e3f7ef;
+    --ambre:      #c77a10;
+    --ambre-pale: #fdf2dd;
+    --rose:       #d63b5e;
+    --rose-pale:  #fdeaef;
+    --bleu:       #1f7ae0;
+    --bleu-pale:  #e6f1fd;
+
+    --ombre:      0 1px 2px rgba(28,27,46,.05), 0 4px 14px rgba(28,27,46,.05);
+    --ombre-fort: 0 2px 6px rgba(28,27,46,.08), 0 12px 32px rgba(28,27,46,.10);
+    --rayon:      14px;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --fond:       #131322;
+      --carte:      #1c1c30;
+      --trait:      #2c2c46;
+      --texte:      #edecf7;
+      --attenue:    #a3a1c0;
+      --doux:       #75739a;
+      --violet-pale:#251f4d;
+      --vert-pale:  #10352a;
+      --ambre-pale: #3a2c10;
+      --rose-pale:  #3d1a26;
+      --bleu-pale:  #142b47;
+      --ombre:      0 1px 2px rgba(0,0,0,.4);
+      --ombre-fort: 0 12px 32px rgba(0,0,0,.5);
+    }
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--fond);
+    color: var(--texte);
+    font: 15px/1.6 "Segoe UI", system-ui, -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ---------- Bandeau ---------- */
+
+  .bandeau {
+    background: linear-gradient(135deg, #6246ea 0%, #8b5cf6 45%, #c026d3 100%);
+    color: #fff;
+    padding: 34px 32px 30px;
+  }
+  .bandeau-interne { max-width: 1240px; margin: 0 auto; }
+
+  h1 {
+    margin: 0 0 6px;
+    font-size: 27px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+  .accroche { opacity: .88; font-size: 14px; margin-bottom: 24px; max-width: 620px; }
+
+  .tuiles {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+    gap: 12px;
+    margin-bottom: 22px;
+  }
+  .tuile {
+    background: rgba(255,255,255,.15);
+    border: 1px solid rgba(255,255,255,.22);
+    border-radius: 12px;
+    padding: 13px 16px;
+    backdrop-filter: blur(6px);
+  }
+  .tuile .chiffre { font-size: 27px; font-weight: 700; line-height: 1.15; }
+  .tuile .libelle { font-size: 11px; opacity: .85; text-transform: uppercase; letter-spacing: .07em; }
+
+  .jauge {
+    height: 9px;
+    border-radius: 99px;
+    background: rgba(255,255,255,.22);
+    overflow: hidden;
+    display: flex;
+  }
+  .jauge span { display: block; height: 100%; transition: width .5s ease; }
+  .jauge .part-enrichi    { background: #4ade80; }
+  .jauge .part-non_trouve { background: #fbbf24; }
+  .jauge .part-echec      { background: #fb7185; }
+
+  .legende {
+    display: flex;
+    gap: 18px;
+    flex-wrap: wrap;
+    font-size: 12px;
+    opacity: .92;
+    margin-top: 9px;
+  }
+  .legende i { width: 9px; height: 9px; border-radius: 3px; display: inline-block; margin-right: 6px; }
+
+  /* ---------- Barre de contrôles ---------- */
+
+  .controles {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    background: var(--carte);
+    border-bottom: 1px solid var(--trait);
+    padding: 14px 32px;
+    box-shadow: var(--ombre);
+  }
+  .controles-interne {
+    max-width: 1240px;
+    margin: 0 auto;
+    display: flex;
+    gap: 9px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .pilule {
+    font: inherit;
+    font-size: 13px;
+    font-weight: 550;
+    padding: 7px 15px;
+    border: 1.5px solid var(--trait);
+    border-radius: 99px;
+    background: transparent;
+    color: var(--attenue);
+    cursor: pointer;
+    transition: all .15s;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+  }
+  .pilule:hover { border-color: var(--violet); color: var(--violet); transform: translateY(-1px); }
+  .pilule .compte {
+    font-size: 11px;
+    font-weight: 700;
+    padding: 1px 7px;
+    border-radius: 99px;
+    background: var(--trait);
+    color: var(--attenue);
+  }
+  .pilule.actif { background: var(--violet); border-color: var(--violet); color: #fff; }
+  .pilule.actif .compte { background: rgba(255,255,255,.26); color: #fff; }
+
+  .champ-recherche { position: relative; margin-left: auto; }
+  .champ-recherche input {
+    font: inherit;
+    font-size: 13.5px;
+    padding: 9px 15px 9px 38px;
+    border: 1.5px solid var(--trait);
+    border-radius: 99px;
+    background: var(--fond);
+    color: var(--texte);
+    width: 300px;
+    transition: all .15s;
+  }
+  .champ-recherche input:focus {
+    outline: none;
+    border-color: var(--violet);
+    background: var(--carte);
+    box-shadow: 0 0 0 4px var(--violet-pale);
+  }
+  .champ-recherche svg {
+    position: absolute;
+    left: 14px; top: 50%;
+    transform: translateY(-50%);
+    color: var(--doux);
+    pointer-events: none;
+  }
+
+  .filtre-actif {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12.5px;
+    color: var(--attenue);
+    width: 100%;
+  }
+  .filtre-actif button {
+    font: inherit;
+    font-size: 12px;
+    border: none;
+    background: var(--violet-pale);
+    color: var(--violet);
+    padding: 3px 10px;
+    border-radius: 99px;
+    cursor: pointer;
+    font-weight: 600;
+  }
+  .filtre-actif button:hover { background: var(--violet); color: #fff; }
+
+  /* ---------- Cartes ---------- */
+
+  main { padding: 24px 32px 70px; max-width: 1240px; margin: 0 auto; }
+
+  .carte {
+    background: var(--carte);
+    border: 1px solid var(--trait);
+    border-left: 4px solid var(--doux);
+    border-radius: var(--rayon);
+    padding: 20px 22px;
+    margin-bottom: 15px;
+    box-shadow: var(--ombre);
+    transition: box-shadow .18s, transform .18s;
+  }
+  .carte:hover { box-shadow: var(--ombre-fort); transform: translateY(-2px); }
+  .carte.enrichi    { border-left-color: var(--vert); }
+  .carte.non_trouve { border-left-color: var(--ambre); }
+  .carte.echec      { border-left-color: var(--rose); }
+  .carte.en_attente { border-left-color: var(--doux); }
+
+  .entete { display: flex; gap: 12px; align-items: flex-start; flex-wrap: wrap; }
+  .nom { font-weight: 650; font-size: 16.5px; flex: 1; min-width: 220px; letter-spacing: -.01em; }
+
+  .badge {
+    font-size: 11px;
+    padding: 4px 11px;
+    border-radius: 99px;
+    font-weight: 650;
+    white-space: nowrap;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .badge::before { content: ''; width: 6px; height: 6px; border-radius: 99px; background: currentColor; }
+  .badge.enrichi    { background: var(--vert-pale);  color: var(--vert); }
+  .badge.non_trouve { background: var(--ambre-pale); color: var(--ambre); }
+  .badge.echec      { background: var(--rose-pale);  color: var(--rose); }
+  .badge.en_attente { background: var(--trait);      color: var(--attenue); }
+
+  .etiquettes { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+  .etiquette {
+    font: inherit;
+    font-size: 11.5px;
+    font-weight: 600;
+    padding: 3px 10px;
+    border-radius: 7px;
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: all .13s;
+  }
+  .etiquette:hover { transform: translateY(-1px); filter: brightness(.94); }
+
+  .note-humaine {
+    margin-top: 14px;
+    font-size: 13.5px;
+    padding: 12px 15px;
+    background: var(--ambre-pale);
+    border-radius: 10px;
+    border: 1px solid color-mix(in srgb, var(--ambre) 22%, transparent);
+  }
+  .note-humaine strong {
+    font-size: 10.5px;
+    text-transform: uppercase;
+    letter-spacing: .07em;
+    color: var(--ambre);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 5px;
+  }
+
+  .resume {
+    margin-top: 14px;
+    font-size: 14.5px;
+    line-height: 1.68;
+    padding: 14px 17px;
+    background: var(--vert-pale);
+    border-radius: 10px;
+    border: 1px solid color-mix(in srgb, var(--vert) 20%, transparent);
+  }
+  .resume strong {
+    font-size: 10.5px;
+    text-transform: uppercase;
+    letter-spacing: .07em;
+    color: var(--vert);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 6px;
+  }
+
+  details.source { margin-top: 12px; }
+  details.source summary {
+    cursor: pointer;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--bleu);
+    padding: 7px 13px;
+    background: var(--bleu-pale);
+    border-radius: 8px;
+    list-style: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    user-select: none;
+    transition: all .13s;
+  }
+  details.source summary::-webkit-details-marker { display: none; }
+  details.source summary:hover { filter: brightness(.96); }
+  details.source summary::before { content: '▸'; transition: transform .18s; }
+  details.source[open] summary::before { transform: rotate(90deg); }
+
+  .brut {
+    margin-top: 9px;
+    font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+    font-size: 12px;
+    line-height: 1.6;
+    max-height: 260px;
+    overflow-y: auto;
+    padding: 13px 15px;
+    border-radius: 10px;
+    background: var(--fond);
+    border: 1px solid var(--trait);
+    white-space: pre-wrap;
+    word-break: break-word;
+    color: var(--attenue);
+  }
+
+  .pied {
+    margin-top: 14px;
+    padding-top: 12px;
+    border-top: 1px dashed var(--trait);
+    font-size: 12.5px;
+    color: var(--attenue);
+    display: flex;
+    gap: 8px 18px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  .pied a {
+    color: var(--violet);
+    text-decoration: none;
+    font-weight: 550;
+    word-break: break-all;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .pied a:hover { text-decoration: underline; }
+  .puce { color: var(--doux); }
+
+  .score { display: inline-flex; align-items: center; gap: 6px; }
+  .score-barre { width: 46px; height: 6px; border-radius: 99px; background: var(--trait); overflow: hidden; }
+  .score-barre span { display: block; height: 100%; background: var(--vert); }
+
+  .message {
+    padding: 70px 20px;
+    text-align: center;
+    color: var(--attenue);
+    background: var(--carte);
+    border-radius: var(--rayon);
+    border: 1px dashed var(--trait);
+  }
+  .message .grand { font-size: 34px; margin-bottom: 10px; }
+  .vide { color: var(--doux); font-style: italic; }
+
+  /* ---------- Barre d'actions ---------- */
+
+  .actions { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+
+  .bouton {
+    font: inherit;
+    font-size: 13.5px;
+    font-weight: 600;
+    padding: 9px 17px;
+    border-radius: 10px;
+    border: none;
+    cursor: pointer;
+    transition: all .15s;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .bouton:disabled { opacity: .5; cursor: not-allowed; transform: none !important; }
+  .bouton:not(:disabled):hover { transform: translateY(-1px); filter: brightness(1.07); }
+
+  .bouton.principal  { background: #fff; color: var(--violet); box-shadow: 0 2px 10px rgba(0,0,0,.14); }
+  .bouton.secondaire { background: rgba(255,255,255,.18); color: #fff; border: 1px solid rgba(255,255,255,.32); }
+
+  .tourne { animation: tourner .9s linear infinite; display: inline-block; }
+  @keyframes tourner { to { transform: rotate(360deg); } }
+
+  .avancement {
+    margin-top: 12px;
+    font-size: 13px;
+    padding: 11px 15px;
+    border-radius: 10px;
+    background: rgba(255,255,255,.16);
+    border: 1px solid rgba(255,255,255,.28);
+    line-height: 1.5;
+  }
+  .avancement.erreur { background: rgba(214,59,94,.3); border-color: rgba(255,255,255,.4); }
+
+  /* ---------- Formulaire d'ajout ---------- */
+
+  .ajout {
+    margin-top: 12px;
+    padding: 15px 17px;
+    border-radius: 12px;
+    background: rgba(255,255,255,.14);
+    border: 1px solid rgba(255,255,255,.28);
+    display: grid;
+    grid-template-columns: 1fr 1.4fr auto;
+    gap: 10px;
+    align-items: center;
+  }
+  .ajout[hidden] { display: none; }
+  @media (max-width: 760px) { .ajout { grid-template-columns: 1fr; } }
+
+  .ajout input {
+    font: inherit;
+    font-size: 13.5px;
+    padding: 9px 13px;
+    border-radius: 9px;
+    border: 1px solid rgba(255,255,255,.35);
+    background: rgba(255,255,255,.9);
+    color: #1c1b2e;
+    min-width: 0;
+  }
+  .ajout input:focus { outline: 2px solid #fff; outline-offset: 1px; }
+
+  /* ---------- Changement d'adresse sur une carte ---------- */
+
+  /* ---------- Suppression ---------- */
+
+  .zone-actions { margin-top: 12px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+
+  .btn-supprimer {
+    font: inherit; font-size: 12.5px; font-weight: 600;
+    padding: 7px 13px; border-radius: 8px;
+    border: 1px solid transparent;
+    background: transparent; color: var(--doux);
+    cursor: pointer; transition: all .13s;
+    margin-left: auto;
+  }
+  .btn-supprimer:hover { background: var(--rose-pale); color: var(--rose); }
+
+  .confirmation {
+    display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+    width: 100%;
+    margin-top: 10px; padding: 11px 13px;
+    background: var(--rose-pale);
+    border: 1px solid color-mix(in srgb, var(--rose) 32%, transparent);
+    border-radius: 9px;
+    font-size: 12.5px;
+    color: var(--rose);
+  }
+  .confirmation span { flex: 1; min-width: 190px; line-height: 1.45; }
+  .confirmation button {
+    font: inherit; font-size: 12.5px; font-weight: 650;
+    padding: 7px 14px; border-radius: 8px; border: none; cursor: pointer;
+  }
+  .confirmation .oui { background: var(--rose); color: #fff; }
+  .confirmation .non { background: var(--carte); color: var(--attenue); border: 1px solid var(--trait); }
+  .confirmation button:disabled { opacity: .55; cursor: not-allowed; }
+
+  .relance { margin-top: 12px; flex: 1; }
+  .relance > summary {
+    cursor: pointer;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--violet);
+    padding: 7px 13px;
+    background: var(--violet-pale);
+    border-radius: 8px;
+    list-style: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    user-select: none;
+  }
+  .relance > summary::-webkit-details-marker { display: none; }
+  .relance > summary:hover { filter: brightness(.96); }
+
+  .relance-corps { display: flex; gap: 8px; margin-top: 9px; flex-wrap: wrap; }
+  .relance-corps input {
+    font: inherit;
+    font-size: 13px;
+    padding: 8px 13px;
+    border-radius: 9px;
+    border: 1.5px solid var(--trait);
+    background: var(--fond);
+    color: var(--texte);
+    flex: 1;
+    min-width: 230px;
+  }
+  .relance-corps input:focus { outline: none; border-color: var(--violet); box-shadow: 0 0 0 3px var(--violet-pale); }
+  .relance-corps button {
+    font: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    padding: 8px 16px;
+    border-radius: 9px;
+    border: none;
+    background: var(--violet);
+    color: #fff;
+    cursor: pointer;
+  }
+  .relance-corps button:disabled { opacity: .55; cursor: not-allowed; }
+  .relance-etat { font-size: 12.5px; margin-top: 7px; color: var(--attenue); }
+
+  /* ---------- Panneau de dialogue ---------- */
+
+  .voile {
+    position: fixed; inset: 0;
+    background: rgba(18,17,32,.45);
+    backdrop-filter: blur(2px);
+    z-index: 40;
+    opacity: 0;
+    transition: opacity .22s;
+  }
+  .voile[hidden] { display: none; }
+  .voile.visible { opacity: 1; }
+
+  .discussion {
+    position: fixed;
+    top: 0; right: 0; bottom: 0;
+    width: min(520px, 100%);
+    background: var(--carte);
+    border-left: 1px solid var(--trait);
+    box-shadow: -14px 0 44px rgba(18,17,32,.22);
+    z-index: 50;
+    display: flex;
+    flex-direction: column;
+    transform: translateX(100%);
+    transition: transform .26s cubic-bezier(.4,0,.2,1);
+  }
+  .discussion[hidden] { display: none; }
+  .discussion.ouverte { transform: translateX(0); }
+
+  .discussion-entete {
+    padding: 18px 22px;
+    background: linear-gradient(135deg, #6246ea, #a855f7);
+    color: #fff;
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  .discussion-entete h2 { margin: 0 0 3px; font-size: 17px; font-weight: 650; }
+  .discussion-entete p { margin: 0; font-size: 12.5px; opacity: .88; line-height: 1.45; }
+  .fermer {
+    font: inherit; font-size: 19px; line-height: 1;
+    background: rgba(255,255,255,.2); color: #fff;
+    border: none; border-radius: 8px;
+    width: 32px; height: 32px; cursor: pointer; flex-shrink: 0;
+  }
+  .fermer:hover { background: rgba(255,255,255,.34); }
+
+  .discussion-corps {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px 22px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .bulle { max-width: 90%; font-size: 14px; line-height: 1.62; }
+  .bulle.moi {
+    align-self: flex-end;
+    background: var(--violet);
+    color: #fff;
+    padding: 10px 15px;
+    border-radius: 15px 15px 4px 15px;
+  }
+  .bulle.robot {
+    align-self: flex-start;
+    background: var(--fond);
+    border: 1px solid var(--trait);
+    padding: 12px 15px;
+    border-radius: 15px 15px 15px 4px;
+    white-space: pre-wrap;
+  }
+  .bulle.robot.insuffisant {
+    background: var(--ambre-pale);
+    border-color: color-mix(in srgb, var(--ambre) 30%, transparent);
+  }
+
+  /* Une reponse venue du web ne doit jamais etre confondue avec le
+     contenu de la base : couleur differente et mention explicite. */
+  .bulle.robot.web {
+    background: var(--bleu-pale);
+    border-color: color-mix(in srgb, var(--bleu) 32%, transparent);
+  }
+  .origine {
+    font-size: 10.5px; text-transform: uppercase; letter-spacing: .07em;
+    font-weight: 700; margin-bottom: 7px;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .origine.web  { color: var(--bleu); }
+  .origine.base { color: var(--vert); }
+
+  .propositions { margin-top: 12px; padding-top: 10px; border-top: 1px dashed var(--trait); }
+  .propositions-titre {
+    font-size: 10.5px; text-transform: uppercase; letter-spacing: .07em;
+    color: var(--attenue); font-weight: 650; margin-bottom: 8px;
+  }
+  .proposition {
+    display: flex; gap: 9px; align-items: center;
+    padding: 9px 11px; margin-bottom: 7px;
+    background: var(--carte); border: 1px solid var(--trait); border-radius: 9px;
+  }
+  .proposition-texte { flex: 1; min-width: 0; font-size: 12.5px; line-height: 1.45; }
+  .proposition-texte strong { display: block; font-weight: 600; }
+  .proposition-texte a { color: var(--attenue); text-decoration: none; font-size: 11.5px; word-break: break-word; }
+  .proposition-texte a:hover { text-decoration: underline; }
+  .proposition button {
+    font: inherit; font-size: 12px; font-weight: 600;
+    padding: 7px 13px; border: none; border-radius: 8px;
+    background: var(--vert); color: #fff; cursor: pointer; white-space: nowrap;
+  }
+  .proposition button:disabled { opacity: .55; cursor: not-allowed; }
+  .proposition.ajoutee { border-color: var(--vert); background: var(--vert-pale); }
+
+  .sources { margin-top: 11px; padding-top: 9px; border-top: 1px dashed var(--trait); }
+  .sources-titre {
+    font-size: 10.5px; text-transform: uppercase; letter-spacing: .07em;
+    color: var(--attenue); font-weight: 650; margin-bottom: 6px;
+  }
+  .source-item { font-size: 12.5px; margin-bottom: 4px; }
+  .source-item a { color: var(--violet); text-decoration: none; font-weight: 550; }
+  .source-item a:hover { text-decoration: underline; }
+  .source-item .prox { color: var(--doux); font-size: 11.5px; }
+
+  .exemples { display: flex; flex-direction: column; gap: 7px; }
+  .exemple {
+    font: inherit; font-size: 13px; text-align: left;
+    padding: 10px 14px; border-radius: 10px;
+    border: 1px solid var(--trait); background: var(--fond);
+    color: var(--attenue); cursor: pointer; transition: all .13s;
+  }
+  .exemple:hover { border-color: var(--violet); color: var(--violet); }
+
+  .discussion-pied {
+    padding: 14px 18px;
+    border-top: 1px solid var(--trait);
+    display: flex; gap: 9px;
+  }
+  .discussion-pied input {
+    font: inherit; font-size: 14px;
+    flex: 1; min-width: 0;
+    padding: 11px 15px;
+    border: 1.5px solid var(--trait);
+    border-radius: 11px;
+    background: var(--fond);
+    color: var(--texte);
+  }
+  .discussion-pied input:focus {
+    outline: none; border-color: var(--violet);
+    box-shadow: 0 0 0 3px var(--violet-pale);
+  }
+  .discussion-pied button {
+    font: inherit; font-size: 14px; font-weight: 600;
+    padding: 11px 19px; border: none; border-radius: 11px;
+    background: var(--violet); color: #fff; cursor: pointer;
+  }
+  .discussion-pied button:disabled { opacity: .5; cursor: not-allowed; }
+
+  .points span {
+    display: inline-block; width: 6px; height: 6px; margin-right: 4px;
+    border-radius: 99px; background: var(--doux);
+    animation: rebond 1.1s infinite;
+  }
+  .points span:nth-child(2) { animation-delay: .16s; }
+  .points span:nth-child(3) { animation-delay: .32s; }
+  @keyframes rebond { 0%,60%,100% { opacity: .3; } 30% { opacity: 1; } }
+
+  @media (max-width: 720px) {
+    .bandeau, .controles, main { padding-left: 18px; padding-right: 18px; }
+    .champ-recherche { margin-left: 0; width: 100%; }
+    .champ-recherche input { width: 100%; }
+  }
+</style>
+</head>
+<body>
+
+<div class="bandeau">
+  <div class="bandeau-interne">
+    <h1>Base de connaissance</h1>
+    <p class="accroche">
+      Champs vides complétés par recherche web réelle. Chaque ajout renvoie à la page
+      dont il provient — rien n'est écrit sans source vérifiable.
+    </p>
+    <div class="tuiles" id="tuiles"></div>
+    <div class="jauge" id="jauge"></div>
+    <div class="legende" id="legende"></div>
+
+    <div class="actions" style="margin-top:20px">
+      <button class="bouton principal" id="btn-enrichir">
+        <span id="icone-enrichir">⟳</span> Compléter les champs vides
+      </button>
+      <button class="bouton secondaire" id="btn-reessayer">
+        ↺ Réessayer les sans source
+      </button>
+      <button class="bouton secondaire" id="btn-ajouter">
+        ＋ Ajouter une adresse
+      </button>
+      <button class="bouton secondaire" id="btn-indexer">
+        ⬡ Indexer pour le chatbot
+      </button>
+      <button class="bouton principal" id="btn-discussion">
+        💬 Interroger la base
+      </button>
+      <button class="bouton secondaire" id="btn-recharger">
+        ⟲ Recharger
+      </button>
+    </div>
+
+    <form class="ajout" id="form-ajout" hidden>
+      <input id="ajout-nom" placeholder="Nom du sujet (facultatif si adresse fournie)">
+      <input id="ajout-url" type="url" placeholder="https://adresse-de-la-page.com">
+      <button class="bouton principal" type="submit" id="btn-valider-ajout">
+        Ajouter et compléter
+      </button>
+    </form>
+
+    <div class="avancement" id="avancement" hidden></div>
+  </div>
+</div>
+
+<div class="controles">
+  <div class="controles-interne" id="controles">
+    <button class="pilule actif" data-filtre="tous">Tout <span class="compte">0</span></button>
+    <button class="pilule" data-filtre="enrichi">Enrichies <span class="compte">0</span></button>
+    <button class="pilule" data-filtre="non_trouve">Sans source <span class="compte">0</span></button>
+    <button class="pilule" data-filtre="en_attente">En attente <span class="compte">0</span></button>
+    <button class="pilule" data-filtre="echec">Échecs <span class="compte">0</span></button>
+
+    <div class="champ-recherche">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round">
+        <circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/>
+      </svg>
+      <input type="search" id="recherche" placeholder="Rechercher un nom, un texte, une étiquette…">
+    </div>
+
+    <div class="filtre-actif" id="filtre-etiquette" hidden></div>
+  </div>
+</div>
+
+<main id="liste"><div class="message"><div class="grand">⏳</div>Chargement des données…</div></main>
+
+<div class="voile" id="voile" hidden></div>
+
+<aside class="discussion" id="discussion" hidden>
+  <div class="discussion-entete">
+    <div style="flex:1">
+      <h2>Interroger la base</h2>
+      <p>
+        La question est convertie en vecteur, les lignes les plus proches sont
+        récupérées, et la réponse ne s'appuie que sur elles.
+      </p>
+    </div>
+    <button class="fermer" id="btn-fermer-discussion" aria-label="Fermer">✕</button>
+  </div>
+
+  <div class="discussion-corps" id="discussion-corps"></div>
+
+  <form class="discussion-pied" id="form-question">
+    <input id="champ-question" placeholder="Ta question…" autocomplete="off">
+    <button type="submit" id="btn-envoyer">Envoyer</button>
+  </form>
+</aside>
+
+
+<script>
+// ================================================================
+//  MAQUETTE - donnees figees, aucune connexion reseau.
+//  Genere par outils/construire-maquette.mjs
+// ================================================================
+const DONNEES_MAQUETTE = [
+  {
+    "id": "6127b2d0-6cb3-4f16-a2bc-08b6038b8fb3",
+    "nom": "Adam Harvey — Anti-Fragile Sycophants",
+    "note_alex": "Artiste découvert pour le dossier AI for Good 2026. Essai visuel sur la censure dans les modèles d'IA générative. Créateur de CV Dazzle (2010). Chief Technologist chez Tech 4 Tracing (2025). Pas de prix spécifique pour cette œuvre.",
+    "texte": "**Anti-Fragile Sycophants**\n\n# Anti-Fragile Sycophants\n\nFigure 1. Prompt: “Photo of a man giving the middle finger”. Image generated with Adobe Firefly. 2024. Source: [Adam Harvey on tldr.nettime.org](https://tldr.nettime.org/@adam_harvey/112279943082768705)\n\nInteracting with generative AI models and finding their failure points is part of how we learn about the digital world that envelopes society today. But as artificial intelligence is increasingly used to censor and monitor unpopular political discourse, understanding how and why it fails will become critical for preserving open dialogue and artistic expression.\n\nFor example, the familiar gesture of giving someone the middle finger–a staple of [modern art](https://www.dazeddigital.com/art-photography/article/59549/1/ai-weiwei-middle-finger-power-avant-arte-design-museum-interview) and political speech–should be easily reproducible by today’s AI algorithms. Anything less would be a form of censorship, blocking a basic form of expression. Yet a few simple experiments with popular commercial generative AI services confirmed this limitation: any prompt containing the phrase “giving the middle finger” resulted in closed fists, alternate fingers, or politely mutated hands.\n\nWhile technically capable of producing such an image–given the vast amount of profanity present in training datasets like Common Crawl and mainstream media (including pirated books and movies)–the generative models consistently and clearly denied my prompts,",
+    "resume": "L'extrait presente \"Anti-Fragile Sycophants\" d'Adam Harvey, qui explore les points de defaillance des modeles d'IA generative. Il illustre son propos avec une image generee par Adobe Firefly a partir du prompt \"Photo of a man giving the middle finger\" : les services commerciaux refusent systematiquement ce geste, produisant poings fermes, autres doigts ou mains deformees. Harvey y voit une forme de censure d'une expression politique et artistique basique, alors meme que les modeles en seraient techniquement capables vu les donnees d'entrainement (Common Crawl, medias, livres et films pirates), et souligne l'enjeu de comprendre ces echecs a l'heure ou l'IA sert a surveiller et censurer les discours politiques.",
+    "url": "https://adam.harvey.studio/anti-fragile-sycophants/",
+    "etiquettes": [
+      "ai",
+      "artiste"
+    ],
+    "statut": "enrichi",
+    "source_url": "https://adam.harvey.studio/anti-fragile-sycophants/",
+    "source_titre": "Anti-Fragile Sycophants - Adam Harvey",
+    "source_extrait": "**Anti-Fragile Sycophants**\n\n# Anti-Fragile Sycophants\n\nFigure 1. Prompt: “Photo of a man giving the middle finger”. Image generated with Adobe Firefly. 2024. Source: [Adam Harvey on tldr.nettime.org](https://tldr.nettime.org/@adam_harvey/112279943082768705)\n\nInteracting with generative AI models and finding their failure points is part of how we learn about the digital world that envelopes society today. But as artificial intelligence is increasingly used to censor and monitor unpopular political discourse, understanding how and why it fails will become critical for preserving open dialogue and artistic expression.\n\nFor example, the familiar gesture of giving someone the middle finger–a staple of [modern art](https://www.dazeddigital.com/art-photography/article/59549/1/ai-weiwei-middle-finger-power-avant-arte-design-museum-interview) and political speech–should be easily reproducible by today’s AI algorithms. Anything less would be a form of censorship, blocking a basic form of expression. Yet a few simple experiments with popular commercial generative AI services confirmed this limitation: any prompt containing the phrase “giving the middle finger” resulted in closed fists, alternate fingers, or politely mutated hands.\n\nWhile technically capable of producing such an image–given the vast amount of profanity present in training datasets like Common Crawl and mainstream media (including pirated books and movies)–the generative models consistently and clearly denied my prompts,",
+    "moteur": "tavily",
+    "resume_modele": "claude-opus-5",
+    "pertinence": null,
+    "champs_enrichis": [
+      "texte",
+      "resume"
+    ],
+    "enrichi_le": "2026-09-05T08:58:03.999+00:00",
+    "erreur": null,
+    "indexe_le": "2026-09-05T11:47:41.447+00:00"
+  },
+  {
+    "id": "63e82663-e942-4650-9c5a-3c0fc923bd99",
+    "nom": "app caféine",
+    "note_alex": null,
+    "texte": "Tahoe \n\n Tahoe\n Sequoia\n Sonoma\n Ventura\n Monterey\n\n# Caffeine\n\nKeeps your Mac awake.\n\nCaffeine app icon\n\nDownload NowVersion 1.6.4 - 4.5 MB\n\nCaffeine is a tiny open source program that puts an icon in the right side of your menubar. Click it to prevent your Mac from automatically going to sleep, dimming the screen or starting screen savers.\n\n### Usage\n\nCaffeine icon in the macOS menu bar [...] Due to the long period of inactivity for Caffeine, a lot of different and great options have been developed. While the alternatives are great apps and definitely worth your consideration, we believe that Caffeine's power lies in its simplicity and ease of use.\n\n### Support\n\nIf you have questions, comments or other feedback just get in touch.\n\n### Source Code\n\nCaffeine is open source software. It's licensed under MIT license and the source code is available on Github. [...] Yes! Tomas Franzén of Lighthead Software originally developed Caffeine in 2006, and it has been a well known and loved utility for Mac users for many years. Its simplicity has allowed it to continue working perfectly long after active development had ceased.  \n   In 2018, Michael Jones (IntelliScape Computer Solutions) reached out to Tomas to inquire if they could continue development of Caffeine.",
+    "resume": "Caffeine est un petit programme open source pour Mac (version 1.6.4, 4,5 Mo) qui ajoute une icône dans la partie droite de la barre de menus : un clic empêche l'ordinateur de se mettre en veille, de réduire la luminosité de l'écran ou de lancer l'économiseur d'écran. Distribué sous licence MIT avec le code source disponible sur Github, il est compatible avec les versions de macOS de Monterey à Tahoe. Créé en 2006 par Tomas Franzén (Lighthead Software), son développement a été repris en 2018 par Michael Jones (IntelliScape Computer Solutions) ; sa force reste sa simplicité face aux alternatives apparues entre-temps.",
+    "url": "https://www.caffeine-app.net/en",
+    "etiquettes": [],
+    "statut": "enrichi",
+    "source_url": "https://www.caffeine-app.net/en",
+    "source_titre": "Caffeine - Keeps your Mac awake.",
+    "source_extrait": "Tahoe \n\n Tahoe\n Sequoia\n Sonoma\n Ventura\n Monterey\n\n# Caffeine\n\nKeeps your Mac awake.\n\nCaffeine app icon\n\nDownload NowVersion 1.6.4 - 4.5 MB\n\nCaffeine is a tiny open source program that puts an icon in the right side of your menubar. Click it to prevent your Mac from automatically going to sleep, dimming the screen or starting screen savers.\n\n### Usage\n\nCaffeine icon in the macOS menu bar [...] Due to the long period of inactivity for Caffeine, a lot of different and great options have been developed. While the alternatives are great apps and definitely worth your consideration, we believe that Caffeine's power lies in its simplicity and ease of use.\n\n### Support\n\nIf you have questions, comments or other feedback just get in touch.\n\n### Source Code\n\nCaffeine is open source software. It's licensed under MIT license and the source code is available on Github. [...] Yes! Tomas Franzén of Lighthead Software originally developed Caffeine in 2006, and it has been a well known and loved utility for Mac users for many years. Its simplicity has allowed it to continue working perfectly long after active development had ceased.  \n   In 2018, Michael Jones (IntelliScape Computer Solutions) reached out to Tomas to inquire if they could continue development of Caffeine.",
+    "moteur": "tavily",
+    "resume_modele": "claude-opus-5",
+    "pertinence": 0.7065353,
+    "champs_enrichis": [
+      "url",
+      "texte",
+      "resume"
+    ],
+    "enrichi_le": "2026-09-05T08:58:31.769+00:00",
+    "erreur": null,
+    "indexe_le": "2026-09-05T11:47:41.706+00:00"
+  },
+  {
+    "id": "10957988-67c2-424a-a8b7-41a323dcf601",
+    "nom": "Aporee",
+    "note_alex": null,
+    "texte": null,
+    "resume": null,
+    "url": "https://aporee.org/maps/",
+    "etiquettes": [],
+    "statut": "non_trouve",
+    "source_url": null,
+    "source_titre": null,
+    "source_extrait": null,
+    "moteur": null,
+    "resume_modele": null,
+    "pertinence": null,
+    "champs_enrichis": [],
+    "enrichi_le": "2026-09-05T08:58:12.686+00:00",
+    "erreur": null,
+    "indexe_le": "2026-09-05T11:47:41.629+00:00"
+  },
+  {
+    "id": "35ca092b-3ff1-4ae0-b1b2-6de3516169d7",
+    "nom": "install comfyui",
+    "note_alex": null,
+    "texte": "https://stable-diffusion-art.com/how-to-install-comfyui/",
+    "resume": null,
+    "url": null,
+    "etiquettes": [
+      "tuto"
+    ],
+    "statut": "non_trouve",
+    "source_url": null,
+    "source_titre": null,
+    "source_extrait": null,
+    "moteur": null,
+    "resume_modele": null,
+    "pertinence": null,
+    "champs_enrichis": [],
+    "enrichi_le": "2026-09-05T09:01:05.09+00:00",
+    "erreur": null,
+    "indexe_le": "2026-09-05T11:47:45.705+00:00"
+  },
+  {
+    "id": "3a19e47f-cf4a-4fe7-a8c4-69b3e51a4da3",
+    "nom": "OSC to moteur driver",
+    "note_alex": null,
+    "texte": "carte moteur driver OSC",
+    "resume": null,
+    "url": "https://github.com/ponoor/STEP400",
+    "etiquettes": [
+      "Matériel"
+    ],
+    "statut": "en_attente",
+    "source_url": null,
+    "source_titre": null,
+    "source_extrait": null,
+    "moteur": null,
+    "resume_modele": null,
+    "pertinence": null,
+    "champs_enrichis": [],
+    "enrichi_le": null,
+    "erreur": null,
+    "indexe_le": "2026-09-05T11:47:48.668+00:00"
+  },
+  {
+    "id": "e7a197bb-9ece-45da-b7ae-c5376d55a2f1",
+    "nom": "http://int.studio/",
+    "note_alex": null,
+    "texte": "INT is a Lausanne-based design studio specializing of art direction, interactive scenography, design and web development.",
+    "resume": "INT est un studio de design basé à Lausanne. Il est spécialisé dans la direction artistique, la scénographie interactive, le design et le développement web.",
+    "url": "https://www.int.studio",
+    "etiquettes": [
+      "studio"
+    ],
+    "statut": "enrichi",
+    "source_url": "https://www.int.studio",
+    "source_titre": "INT studio",
+    "source_extrait": "INT is a Lausanne-based design studio specializing of art direction, interactive scenography, design and web development.",
+    "moteur": "tavily",
+    "resume_modele": "claude-opus-5",
+    "pertinence": 0.7593865,
+    "champs_enrichis": [
+      "url",
+      "texte",
+      "resume"
+    ],
+    "enrichi_le": "2026-09-05T09:00:08.921+00:00",
+    "erreur": null,
+    "indexe_le": "2026-09-05T11:47:44.884+00:00"
+  },
+  {
+    "id": "fictif-echec",
+    "nom": "EXEMPLE FICTIF — page inaccessible",
+    "statut": "echec",
+    "etiquettes": [
+      "exemple"
+    ],
+    "erreur": "Tavily extract a repondu 403",
+    "note_alex": null,
+    "texte": null,
+    "resume": null,
+    "url": "https://site-protege.example/page",
+    "source_url": null,
+    "source_titre": null,
+    "pertinence": null,
+    "champs_enrichis": [],
+    "indexe_le": null
+  }
+];
+const STATISTIQUES_REELLES = {"enrichi":53,"non_trouve":16,"en_attente":82};
+
+// Aucune requete ne doit sortir de cette page. Les gestionnaires qui
+// appelaient le serveur (suppression, ajout, dialogue) recoivent ici une
+// reponse claire au lieu d'une erreur reseau incomprehensible.
+window.fetch = async () => ({
+    ok: true,
+    json: async () => ({ erreur: "Maquette : cette action nécessite le serveur du projet." }),
+});
+</script>
+<script>
+const LIBELLES = {
+  enrichi:    'enrichi',
+  non_trouve: 'sans source',
+  echec:      'échec',
+  en_attente: 'en attente',
+};
+
+// Teintes attribuées de façon stable à chaque étiquette : la même
+// étiquette garde sa couleur d'une session à l'autre.
+const TEINTES = [
+  ['#6246ea', '#efecff'], ['#0f9d6e', '#e3f7ef'], ['#c77a10', '#fdf2dd'],
+  ['#d63b5e', '#fdeaef'], ['#1f7ae0', '#e6f1fd'], ['#8b3fc7', '#f5eafc'],
+  ['#0d8a8a', '#e0f5f5'], ['#b1441f', '#fdece5'],
+];
+
+function teinte(etiquette) {
+  let h = 0;
+  for (const c of etiquette) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+  return TEINTES[h % TEINTES.length];
+}
+
+let lignes = [];
+let filtre = 'tous';
+let requete = '';
+let etiquetteChoisie = null;
+
+const echapper = (s) => String(s ?? '').replace(/[&<>"]/g,
+  (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+// Quelques lignes du CSV portent une URL en guise de nom, parfois tres
+// longue (parametres de tracking). On affiche une forme lisible, la valeur
+// complete restant accessible au survol.
+function nomLisible(nom) {
+  if (!nom) return '(sans nom)';
+  if (!/^https?:\/\//i.test(nom)) return nom;
+  try {
+    const u = new URL(nom);
+    const chemin = u.pathname.replace(/\/$/, '');
+    const court = u.hostname.replace(/^www\./, '') + (chemin.length > 1 ? chemin : '');
+    return court.length > 60 ? court.slice(0, 60) + '…' : court;
+  } catch {
+    return nom.length > 60 ? nom.slice(0, 60) + '…' : nom;
+  }
+}
+
+function afficherEntete() {
+  const par = STATISTIQUES_REELLES;
+  const champs = lignes.reduce((n, l) => n + (l.champs_enrichis?.length ?? 0), 0);
+  const total = lignes.length || 1;
+
+  document.getElementById('tuiles').innerHTML = [
+    ['Lignes', 151],
+    ['Enrichies', par.enrichi ?? 0],
+    ['Sans source', par.non_trouve ?? 0],
+    ['Champs complétés', champs],
+  ].map(([libelle, chiffre]) =>
+    `<div class="tuile"><div class="chiffre">${chiffre}</div><div class="libelle">${libelle}</div></div>`
+  ).join('');
+
+  document.getElementById('jauge').innerHTML = ['enrichi', 'non_trouve', 'echec']
+    .map((s) => `<span class="part-${s}" style="width:${((par[s] ?? 0) / total * 100).toFixed(1)}%"></span>`)
+    .join('');
+
+  const couleurs = { enrichi: '#4ade80', non_trouve: '#fbbf24', echec: '#fb7185' };
+  document.getElementById('legende').innerHTML = Object.entries(couleurs)
+    .map(([s, c]) =>
+      `<span><i style="background:${c}"></i>${LIBELLES[s]} · ${par[s] ?? 0}</span>`)
+    .join('') + `<span><i style="background:rgba(255,255,255,.3)"></i>en attente · ${par.en_attente ?? 0}</span>`;
+
+  document.querySelectorAll('.pilule').forEach((b) => {
+    const f = b.dataset.filtre;
+    b.querySelector('.compte').textContent = f === 'tous' ? 151 : (par[f] ?? 0);
+  });
+}
+
+function carte(l) {
+  const etiquettes = (l.etiquettes ?? []).map((e) => {
+    const [avant, fond] = teinte(e);
+    return `<button class="etiquette" data-etiquette="${echapper(e)}"
+              style="background:${fond};color:${avant};border-color:${avant}33">${echapper(e)}</button>`;
+  }).join('');
+
+  const note = l.note_alex ? `
+    <div class="note-humaine">
+      <strong>✍️ Note humaine — saisie manuellement</strong>
+      ${echapper(l.note_alex)}
+    </div>` : '';
+
+  const resume = l.resume ? `
+    <div class="resume">
+      <strong>✨ Résumé — reformulé par ${echapper(l.resume_modele ?? 'le modèle')}</strong>
+      ${echapper(l.resume)}
+    </div>` : '';
+
+  const brut = l.texte ? `
+    <details class="source">
+      <summary>Voir le texte source brut, non reformulé</summary>
+      <div class="brut">${echapper(l.texte)}</div>
+    </details>` : '';
+
+  const pieces = [];
+  const lien = l.source_url || l.url;
+  if (lien) {
+    pieces.push(`<a href="${echapper(lien)}" target="_blank" rel="noopener">
+      🔗 ${echapper((l.source_titre || lien).slice(0, 66))}</a>`);
+  }
+  if (l.pertinence != null) {
+    const pc = Math.round(Number(l.pertinence) * 100);
+    pieces.push(`<span class="score">Pertinence
+      <span class="score-barre"><span style="width:${pc}%"></span></span>
+      ${(Number(l.pertinence)).toFixed(2)}</span>`);
+  }
+  if (l.champs_enrichis?.length) pieces.push(`Complété : <strong>${l.champs_enrichis.join(', ')}</strong>`);
+  if (l.erreur) pieces.push(`<span style="color:var(--rose)">${echapper(l.erreur)}</span>`);
+
+  const pied = pieces.length
+    ? `<div class="pied">${pieces.join('<span class="puce">·</span>')}</div>` : '';
+
+  // Saisir une adresse relance la completion de cette ligne a partir
+  // de cette page precise, en ecrasant ce que la machine avait trouve.
+  const relance = `
+    <details class="relance">
+      <summary>✎ ${l.url ? "Changer l'adresse" : 'Renseigner une adresse'} et recompléter</summary>
+      <div class="relance-corps">
+        <input type="url" placeholder="https://…" value="${echapper(l.url ?? '')}"
+               data-champ-url="${l.id}">
+        <button data-relancer="${l.id}">Compléter depuis cette page</button>
+      </div>
+      <div class="relance-etat" data-etat="${l.id}"></div>
+    </details>`;
+
+  const rienDuTout = !note && !resume && !brut && !pied;
+
+  return `
+    <article class="carte ${l.statut}">
+      <div class="entete">
+        <div class="nom" title="${echapper(l.nom ?? '')}">${echapper(nomLisible(l.nom))}</div>
+        <span class="badge ${l.statut}">${LIBELLES[l.statut] ?? l.statut}</span>
+      </div>
+      ${etiquettes ? `<div class="etiquettes">${etiquettes}</div>` : ''}
+      ${note}${resume}${brut}${pied}
+      ${rienDuTout ? '<div class="pied vide">Aucune information disponible pour cette ligne.</div>' : ''}
+      <div class="zone-actions">
+        ${relance}
+        <button class="btn-supprimer" data-supprimer="${l.id}"
+                data-nom="${echapper(l.nom ?? '(sans nom)')}">🗑 Supprimer</button>
+      </div>
+    </article>`;
+}
+
+function rendre() {
+  const q = requete.trim().toLowerCase();
+
+  const visibles = lignes.filter((l) => {
+    if (filtre !== 'tous' && l.statut !== filtre) return false;
+    if (etiquetteChoisie && !(l.etiquettes ?? []).includes(etiquetteChoisie)) return false;
+    if (!q) return true;
+    return [l.nom, l.texte, l.resume, l.note_alex, (l.etiquettes ?? []).join(' ')]
+      .join(' ').toLowerCase().includes(q);
+  });
+
+  document.getElementById('liste').innerHTML = visibles.length
+    ? visibles.map(carte).join('')
+    : `<div class="message"><div class="grand">🔍</div>Aucune ligne ne correspond à ces critères.</div>`;
+
+  document.querySelectorAll('.etiquette').forEach((b) => {
+    b.addEventListener('click', () => {
+      etiquetteChoisie = b.dataset.etiquette;
+      majFiltreEtiquette();
+      rendre();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+  });
+}
+
+function majFiltreEtiquette() {
+  const zone = document.getElementById('filtre-etiquette');
+  zone.hidden = !etiquetteChoisie;
+  if (etiquetteChoisie) {
+    zone.innerHTML = `Filtré sur l'étiquette « <strong>${echapper(etiquetteChoisie)}</strong> »
+      <button id="retirer-etiquette">✕ retirer</button>`;
+    document.getElementById('retirer-etiquette').addEventListener('click', () => {
+      etiquetteChoisie = null;
+      majFiltreEtiquette();
+      rendre();
+    });
+  }
+}
+
+document.querySelectorAll('.pilule').forEach((b) => {
+  b.addEventListener('click', () => {
+    document.querySelectorAll('.pilule').forEach((x) => x.classList.remove('actif'));
+    b.classList.add('actif');
+    filtre = b.dataset.filtre;
+    rendre();
+  });
+});
+
+document.getElementById('recherche').addEventListener('input', (e) => {
+  requete = e.target.value;
+  rendre();
+});
+
+// ---------- Chargement et actions ----------
+
+const zoneAvancement = document.getElementById('avancement');
+
+function annoncer(texte, estErreur = false) {
+  zoneAvancement.hidden = false;
+  zoneAvancement.classList.toggle('erreur', estErreur);
+  zoneAvancement.innerHTML = texte;
+}
+
+const boutons = ['btn-enrichir', 'btn-reessayer', 'btn-ajouter', 'btn-recharger',
+                 'btn-valider-ajout', 'btn-indexer']
+  .map((id) => document.getElementById(id));
+
+function verrouiller(actif) {
+  boutons.forEach((b) => (b.disabled = actif));
+  document.getElementById('icone-enrichir').className = actif ? 'tourne' : '';
+  document.querySelectorAll('[data-relancer]').forEach((b) => (b.disabled = actif));
+}
+
+async function charger() {
+  lignes = DONNEES_MAQUETTE;
+  afficherEntete();
+  rendre();
+}
+
+function resumerBilan(bilan) {
+  const parties = [];
+  if (bilan.enrichi)    parties.push(`<strong>${bilan.enrichi}</strong> complétée${bilan.enrichi > 1 ? 's' : ''}`);
+  if (bilan.non_trouve) parties.push(`<strong>${bilan.non_trouve}</strong> sans source exploitable`);
+  if (bilan.echec)      parties.push(`<strong>${bilan.echec}</strong> en échec`);
+  return parties.length ? parties.join(' · ') : 'aucune ligne à traiter';
+}
+
+/** Appelle un point d'acces d'ecriture, puis recharge l'affichage. */
+async function agir(url, corps, libelle) {
+  annoncer('Maquette : « ' + libelle + ' » n\'est pas actif ici.');
+  return {};
+}
+
+document.getElementById('btn-enrichir').addEventListener('click', () =>
+  agir('/api/enrichir', {}, 'Complétion des champs vides en cours').catch(() => {}));
+
+document.getElementById('btn-reessayer').addEventListener('click', () => {
+  const sansSource = lignes.filter((l) => l.statut === 'non_trouve' || l.statut === 'echec').length;
+  if (!sansSource) return annoncer('Aucune ligne sans source à réessayer.');
+  if (!confirm(`Réessayer les ${sansSource} lignes sans source ? Chacune déclenche une nouvelle recherche web.`)) return;
+  agir('/api/reessayer', {}, 'Nouvelle tentative sur les lignes sans source').catch(() => {});
+});
+
+document.getElementById('btn-recharger').addEventListener('click', async () => {
+  verrouiller(true);
+  try {
+    await charger();
+    annoncer('Affichage rechargé depuis la base.');
+  } catch (e) {
+    annoncer(`Rechargement impossible : ${echapper(e.message)}`, true);
+  } finally {
+    verrouiller(false);
+  }
+});
+
+document.getElementById('btn-ajouter').addEventListener('click', () => {
+  const f = document.getElementById('form-ajout');
+  f.hidden = !f.hidden;
+  if (!f.hidden) document.getElementById('ajout-nom').focus();
+});
+
+document.getElementById('form-ajout').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const nom = document.getElementById('ajout-nom').value.trim();
+  const url = document.getElementById('ajout-url').value.trim();
+  if (!nom && !url) return annoncer('Renseigne au moins un nom ou une adresse.', true);
+
+  try {
+    await agir('/api/ligne', { nom, url }, `Ajout de « ${nom || url} » et complétion`);
+    document.getElementById('ajout-nom').value = '';
+    document.getElementById('ajout-url').value = '';
+    document.getElementById('form-ajout').hidden = true;
+  } catch { /* message deja affiche */ }
+});
+
+// Suppression : confirmation en deux temps, dans la carte elle-meme.
+// Une boite de dialogue du navigateur se valide par reflexe ; ici il faut
+// lire le nom de la ligne avant de confirmer.
+document.getElementById('liste').addEventListener('click', (e) => {
+  const bouton = e.target.closest('[data-supprimer]');
+  if (!bouton) return;
+
+  const carte = bouton.closest('.carte');
+  if (carte.querySelector('.confirmation')) return; // deja demande
+
+  const id = bouton.dataset.supprimer;
+  const nom = bouton.dataset.nom;
+  bouton.style.visibility = 'hidden';
+
+  const zone = document.createElement('div');
+  zone.className = 'confirmation';
+  zone.innerHTML = `
+    <span>Supprimer <strong>${echapper(nom)}</strong> définitivement ?
+      Cette action est irréversible.</span>
+    <button class="oui">Supprimer</button>
+    <button class="non">Annuler</button>`;
+  carte.querySelector('.zone-actions').appendChild(zone);
+
+  zone.querySelector('.non').addEventListener('click', () => {
+    zone.remove();
+    bouton.style.visibility = '';
+  });
+
+  zone.querySelector('.oui').addEventListener('click', async (ev) => {
+    ev.target.disabled = true;
+    ev.target.textContent = 'Suppression…';
+    try {
+      const rep = await fetch('/api/ligne/supprimer', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id }),
+      });
+      const data = await rep.json();
+      if (data.erreur) throw new Error(data.erreur);
+
+      await charger();
+      annoncer(`« ${echapper(data.supprime)} » supprimée de la base.`);
+    } catch (err) {
+      zone.innerHTML = `<span>Échec : ${echapper(err.message)}</span>`;
+    }
+  });
+});
+
+// Relance ligne par ligne, par delegation : les cartes sont reconstruites
+// a chaque rendu, un ecouteur global survit a ces reconstructions.
+document.getElementById('liste').addEventListener('click', async (e) => {
+  const bouton = e.target.closest('[data-relancer]');
+  if (!bouton) return;
+
+  const id = bouton.dataset.relancer;
+  const champ = document.querySelector(`[data-champ-url="${id}"]`);
+  const etat = document.querySelector(`[data-etat="${id}"]`);
+  const url = champ.value.trim();
+
+  if (!/^https?:\/\//i.test(url)) {
+    etat.textContent = "L'adresse doit commencer par http:// ou https://";
+    return;
+  }
+
+  etat.innerHTML = '<span class="tourne">⟳</span> Lecture de la page en cours…';
+  try {
+    await agir('/api/ligne/url', { id, url }, 'Complétion depuis la nouvelle adresse');
+  } catch { /* message deja affiche dans le bandeau */ }
+});
+
+document.getElementById('btn-indexer').addEventListener('click', () =>
+  agir('/api/indexer', {}, 'Calcul des vecteurs sémantiques').catch(() => {}));
+
+// ---------- Panneau de dialogue ----------
+
+const panneau = document.getElementById('discussion');
+const voile = document.getElementById('voile');
+const corps = document.getElementById('discussion-corps');
+const champQuestion = document.getElementById('champ-question');
+const btnEnvoyer = document.getElementById('btn-envoyer');
+
+let historique = [];
+
+const EXEMPLES = [
+  'Quels artistes travaillent sur la surveillance ou la biométrie ?',
+  'Qu\'est-ce que je sais sur les profilés aluminium ?',
+  'Quels outils logiciels pour l\'animation procédurale ?',
+];
+
+function ouvrirDiscussion(ouvrir) {
+  if (ouvrir) {
+    voile.hidden = false;
+    panneau.hidden = false;
+    requestAnimationFrame(() => {
+      voile.classList.add('visible');
+      panneau.classList.add('ouverte');
+    });
+    if (!historique.length) accueil();
+    champQuestion.focus();
+  } else {
+    voile.classList.remove('visible');
+    panneau.classList.remove('ouverte');
+    setTimeout(() => { voile.hidden = true; panneau.hidden = true; }, 260);
+  }
+}
+
+function accueil() {
+  const indexees = lignes.filter((l) => l.indexe_le).length;
+  corps.innerHTML = `
+    <div class="bulle robot">
+      ${indexees
+        ? `${indexees} lignes sont indexées et interrogeables. Je réponds d'abord à partir d'elles, en citant mes sources.\n\nSi ta base ne contient pas la réponse, je vais la chercher sur le web — et je te proposerai d'ajouter la page trouvée.`
+        : `Aucune ligne n'est encore indexée. Ferme ce panneau et clique sur « Indexer pour le chatbot » d'abord.`}
+    </div>
+    ${indexees ? `<div class="exemples">${EXEMPLES.map(
+      (e) => `<button class="exemple">${echapper(e)}</button>`).join('')}</div>` : ''}`;
+
+  corps.querySelectorAll('.exemple').forEach((b) => {
+    b.addEventListener('click', () => {
+      champQuestion.value = b.textContent;
+      document.getElementById('form-question').requestSubmit();
+    });
+  });
+}
+
+function ajouterBulle(html, classe = 'robot') {
+  const d = document.createElement('div');
+  d.className = `bulle ${classe}`;
+  d.innerHTML = html;
+  corps.appendChild(d);
+  corps.scrollTop = corps.scrollHeight;
+  return d;
+}
+
+// Ajout d'une page proposee par le chatbot. Par delegation : les bulles
+// sont creees au fil de la conversation.
+corps.addEventListener('click', async (e) => {
+  const bouton = e.target.closest('[data-ajouter]');
+  if (!bouton) return;
+
+  const ligne = bouton.closest('.proposition');
+  bouton.disabled = true;
+  bouton.textContent = 'Ajout…';
+
+  try {
+    const rep = await fetch('/api/ligne', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ nom: bouton.dataset.nom, url: bouton.dataset.url }),
+    });
+    const data = await rep.json();
+    if (data.erreur) throw new Error(data.erreur);
+
+    ligne.classList.add('ajoutee');
+    bouton.textContent = data.resultat === 'enrichi' ? '✓ Ajoutée' : `✓ Ajoutée (${data.resultat})`;
+
+    // La ligne est deja indexee cote serveur : le chatbot la connait
+    // des la question suivante. On rafraichit la liste derriere le panneau.
+    await charger();
+    annoncer(`« ${bouton.dataset.nom} » ajoutée à la base et indexée.`);
+  } catch (err) {
+    bouton.disabled = false;
+    bouton.textContent = '＋ Ajouter';
+    ligne.querySelector('.proposition-texte').insertAdjacentHTML(
+      'beforeend', `<div style="color:var(--rose);font-size:11.5px">${echapper(err.message)}</div>`);
+  }
+});
+
+document.getElementById('btn-discussion').addEventListener('click', () => ouvrirDiscussion(true));
+document.getElementById('btn-fermer-discussion').addEventListener('click', () => ouvrirDiscussion(false));
+voile.addEventListener('click', () => ouvrirDiscussion(false));
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && !panneau.hidden) ouvrirDiscussion(false);
+});
+
+document.getElementById('form-question').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const question = champQuestion.value.trim();
+  if (!question) return;
+
+  corps.querySelector('.exemples')?.remove();
+  ajouterBulle(echapper(question), 'moi');
+  champQuestion.value = '';
+  champQuestion.disabled = btnEnvoyer.disabled = true;
+
+  const attente = ajouterBulle('<span class="points"><span></span><span></span><span></span></span>');
+
+  try {
+    const rep = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ question, historique }),
+    });
+    const data = await rep.json();
+    if (data.erreur) throw new Error(data.erreur);
+
+    const duWeb = data.origine === 'web';
+
+    const sources = (data.sources ?? []).map((s) => `
+      <div class="source-item">
+        ${s.url
+          ? `<a href="${echapper(s.url)}" target="_blank" rel="noopener">${echapper(s.nom || s.titre || s.url)}</a>`
+          : echapper(s.nom ?? '')}
+        <span class="prox">· ${duWeb ? 'pertinence' : 'proximité'} ${Number(s.similarite).toFixed(2)}</span>
+      </div>`).join('');
+
+    const propositions = (data.propositions ?? []).map((p, i) => `
+      <div class="proposition" data-prop="${i}">
+        <div class="proposition-texte">
+          <strong>${echapper(p.nom || p.titre || '')}</strong>
+          <a href="${echapper(p.url)}" target="_blank" rel="noopener"
+             title="${echapper(p.url)}">${echapper(nomLisible(p.url))}</a>
+        </div>
+        <button data-ajouter="${i}"
+                data-nom="${echapper(p.nom || p.titre || '')}"
+                data-url="${echapper(p.url)}">＋ Ajouter</button>
+      </div>`).join('');
+
+    const banniere = duWeb
+      ? `<div class="origine web">🌐 Réponse trouvée sur le web — absente de ta base</div>`
+      : (data.origine === 'base'
+          ? `<div class="origine base">◆ Réponse issue de ta base</div>`
+          : '');
+
+    attente.className = `bulle robot${duWeb ? ' web' : (data.suffisant ? '' : ' insuffisant')}`;
+    attente.innerHTML =
+      banniere +
+      echapper(data.reponse) +
+      (sources ? `<div class="sources"><div class="sources-titre">${duWeb ? 'Pages web citées' : 'Lignes utilisées'}</div>${sources}</div>` : '') +
+      (propositions ? `<div class="propositions"><div class="propositions-titre">Ajouter à la base ?</div>${propositions}</div>` : '');
+
+    historique.push({ role: 'user', contenu: question });
+    historique.push({ role: 'assistant', contenu: data.reponse });
+  } catch (err) {
+    attente.className = 'bulle robot insuffisant';
+    attente.textContent = `Échec : ${err.message}`;
+  } finally {
+    champQuestion.disabled = btnEnvoyer.disabled = false;
+    champQuestion.focus();
+    corps.scrollTop = corps.scrollHeight;
+  }
+});
+
+charger().catch((e) => {
+  document.getElementById('liste').innerHTML =
+    `<div class="message"><div class="grand">⚠️</div>Chargement impossible : ${echapper(e.message)}</div>`;
+});
+</script>
+
+<script>
+// Remplit le panneau de dialogue avec un echange representatif :
+// une reponse issue de la base, puis une reponse venue du web avec
+// ses propositions d'ajout. Les deux etats doivent etre designes.
+window.addEventListener('load', () => {
+  setTimeout(() => {
+    const c = document.getElementById('discussion-corps');
+    if (!c) return;
+    c.innerHTML = `
+      <div class="bulle moi">Quels artistes travaillent sur la surveillance ?</div>
+      <div class="bulle robot">
+        <div class="origine base">◆ Réponse issue de ta base</div>Plusieurs artistes de la base touchent à ces sujets : Marta Revuelta (profilage biométrique, Genève), Adam Harvey (CV Dazzle, camouflage anti-reconnaissance faciale) et Sarah Ciston (AI War Cloud Database).
+        <div class="sources">
+          <div class="sources-titre">Lignes utilisées</div>
+          <div class="source-item"><a href="#">Marta Revuelta — Media Artist</a> <span class="prox">· proximité 0.86</span></div>
+          <div class="source-item"><a href="#">Adam Harvey — Anti-Fragile Sycophants</a> <span class="prox">· proximité 0.81</span></div>
+        </div>
+      </div>
+      <div class="bulle moi">Et sur les imprimantes 3D résine grand format ?</div>
+      <div class="bulle robot web">
+        <div class="origine web">🌐 Réponse trouvée sur le web — absente de ta base</div>Trois modèles reviennent : la Formlabs Form 4L, la Peopoly Phenom XXL et la Elegoo Jupiter SE. Les extraits comparent volumes d'impression et prix.
+        <div class="sources">
+          <div class="sources-titre">Pages web citées</div>
+          <div class="source-item"><a href="#">Comparaison des imprimantes 3D résine grand format</a> <span class="prox">· pertinence 0.82</span></div>
+        </div>
+        <div class="propositions">
+          <div class="propositions-titre">Ajouter à la base ?</div>
+          <div class="proposition">
+            <div class="proposition-texte">
+              <strong>Imprimantes 3D résine grand format</strong>
+              <a href="#">lopmate.com/fr/articles-comparaison</a>
+            </div>
+            <button>＋ Ajouter</button>
+          </div>
+          <div class="proposition ajoutee">
+            <div class="proposition-texte">
+              <strong>Formlabs Form 4L</strong>
+              <a href="#">formlabs.com/fr/3d-printers/form-4l</a>
+            </div>
+            <button disabled>✓ Ajoutée</button>
+          </div>
+        </div>
+      </div>`;
+  }, 300);
+});
+</script>
+</body>
+</html>
