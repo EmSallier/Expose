@@ -1,0 +1,20 @@
+{
+  "name": "expose-base-connaissance",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Import d'une base de connaissance CSV dans Supabase, puis enrichissement des champs vides par recherche web reelle.",
+  "scripts": {
+    "verifier": "node src/verifier.mjs",
+    "importer": "node src/importer.mjs",
+    "enrichir": "node src/enrichir.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.115.0",
+    "csv-parse": "^7.0.2",
+    "dotenv": "^17.4.2"
+  }
+}
