@@ -372,6 +372,118 @@
   .message .grand { font-size: 34px; margin-bottom: 10px; }
   .vide { color: var(--doux); font-style: italic; }
 
+  /* ---------- Barre d'actions ---------- */
+
+  .actions { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+
+  .bouton {
+    font: inherit;
+    font-size: 13.5px;
+    font-weight: 600;
+    padding: 9px 17px;
+    border-radius: 10px;
+    border: none;
+    cursor: pointer;
+    transition: all .15s;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .bouton:disabled { opacity: .5; cursor: not-allowed; transform: none !important; }
+  .bouton:not(:disabled):hover { transform: translateY(-1px); filter: brightness(1.07); }
+
+  .bouton.principal  { background: #fff; color: var(--violet); box-shadow: 0 2px 10px rgba(0,0,0,.14); }
+  .bouton.secondaire { background: rgba(255,255,255,.18); color: #fff; border: 1px solid rgba(255,255,255,.32); }
+
+  .tourne { animation: tourner .9s linear infinite; display: inline-block; }
+  @keyframes tourner { to { transform: rotate(360deg); } }
+
+  .avancement {
+    margin-top: 12px;
+    font-size: 13px;
+    padding: 11px 15px;
+    border-radius: 10px;
+    background: rgba(255,255,255,.16);
+    border: 1px solid rgba(255,255,255,.28);
+    line-height: 1.5;
+  }
+  .avancement.erreur { background: rgba(214,59,94,.3); border-color: rgba(255,255,255,.4); }
+
+  /* ---------- Formulaire d'ajout ---------- */
+
+  .ajout {
+    margin-top: 12px;
+    padding: 15px 17px;
+    border-radius: 12px;
+    background: rgba(255,255,255,.14);
+    border: 1px solid rgba(255,255,255,.28);
+    display: grid;
+    grid-template-columns: 1fr 1.4fr auto;
+    gap: 10px;
+    align-items: center;
+  }
+  .ajout[hidden] { display: none; }
+  @media (max-width: 760px) { .ajout { grid-template-columns: 1fr; } }
+
+  .ajout input {
+    font: inherit;
+    font-size: 13.5px;
+    padding: 9px 13px;
+    border-radius: 9px;
+    border: 1px solid rgba(255,255,255,.35);
+    background: rgba(255,255,255,.9);
+    color: #1c1b2e;
+    min-width: 0;
+  }
+  .ajout input:focus { outline: 2px solid #fff; outline-offset: 1px; }
+
+  /* ---------- Changement d'adresse sur une carte ---------- */
+
+  .relance { margin-top: 12px; }
+  .relance > summary {
+    cursor: pointer;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--violet);
+    padding: 7px 13px;
+    background: var(--violet-pale);
+    border-radius: 8px;
+    list-style: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    user-select: none;
+  }
+  .relance > summary::-webkit-details-marker { display: none; }
+  .relance > summary:hover { filter: brightness(.96); }
+
+  .relance-corps { display: flex; gap: 8px; margin-top: 9px; flex-wrap: wrap; }
+  .relance-corps input {
+    font: inherit;
+    font-size: 13px;
+    padding: 8px 13px;
+    border-radius: 9px;
+    border: 1.5px solid var(--trait);
+    background: var(--fond);
+    color: var(--texte);
+    flex: 1;
+    min-width: 230px;
+  }
+  .relance-corps input:focus { outline: none; border-color: var(--violet); box-shadow: 0 0 0 3px var(--violet-pale); }
+  .relance-corps button {
+    font: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    padding: 8px 16px;
+    border-radius: 9px;
+    border: none;
+    background: var(--violet);
+    color: #fff;
+    cursor: pointer;
+  }
+  .relance-corps button:disabled { opacity: .55; cursor: not-allowed; }
+  .relance-etat { font-size: 12.5px; margin-top: 7px; color: var(--attenue); }
+
   @media (max-width: 720px) {
     .bandeau, .controles, main { padding-left: 18px; padding-right: 18px; }
     .champ-recherche { margin-left: 0; width: 100%; }
@@ -391,6 +503,31 @@
     <div class="tuiles" id="tuiles"></div>
     <div class="jauge" id="jauge"></div>
     <div class="legende" id="legende"></div>
+
+    <div class="actions" style="margin-top:20px">
+      <button class="bouton principal" id="btn-enrichir">
+        <span id="icone-enrichir">⟳</span> Compléter les champs vides
+      </button>
+      <button class="bouton secondaire" id="btn-reessayer">
+        ↺ Réessayer les sans source
+      </button>
+      <button class="bouton secondaire" id="btn-ajouter">
+        ＋ Ajouter une adresse
+      </button>
+      <button class="bouton secondaire" id="btn-recharger">
+        ⟲ Recharger
+      </button>
+    </div>
+
+    <form class="ajout" id="form-ajout" hidden>
+      <input id="ajout-nom" placeholder="Nom du sujet (facultatif si adresse fournie)">
+      <input id="ajout-url" type="url" placeholder="https://adresse-de-la-page.com">
+      <button class="bouton principal" type="submit" id="btn-valider-ajout">
+        Ajouter et compléter
+      </button>
+    </form>
+
+    <div class="avancement" id="avancement" hidden></div>
   </div>
 </div>
 
@@ -534,6 +671,19 @@ function carte(l) {
   const pied = pieces.length
     ? `<div class="pied">${pieces.join('<span class="puce">·</span>')}</div>` : '';
 
+  // Saisir une adresse relance la completion de cette ligne a partir
+  // de cette page precise, en ecrasant ce que la machine avait trouve.
+  const relance = `
+    <details class="relance">
+      <summary>✎ ${l.url ? "Changer l'adresse" : 'Renseigner une adresse'} et recompléter</summary>
+      <div class="relance-corps">
+        <input type="url" placeholder="https://…" value="${echapper(l.url ?? '')}"
+               data-champ-url="${l.id}">
+        <button data-relancer="${l.id}">Compléter depuis cette page</button>
+      </div>
+      <div class="relance-etat" data-etat="${l.id}"></div>
+    </details>`;
+
   const rienDuTout = !note && !resume && !brut && !pied;
 
   return `
@@ -545,6 +695,7 @@ function carte(l) {
       ${etiquettes ? `<div class="etiquettes">${etiquettes}</div>` : ''}
       ${note}${resume}${brut}${pied}
       ${rienDuTout ? '<div class="pied vide">Aucune information disponible pour cette ligne.</div>' : ''}
+      ${relance}
     </article>`;
 }
 
@@ -601,18 +752,138 @@ document.getElementById('recherche').addEventListener('input', (e) => {
   rendre();
 });
 
-fetch('/api/lignes')
-  .then((r) => r.json())
-  .then((data) => {
+// ---------- Chargement et actions ----------
+
+const zoneAvancement = document.getElementById('avancement');
+
+function annoncer(texte, estErreur = false) {
+  zoneAvancement.hidden = false;
+  zoneAvancement.classList.toggle('erreur', estErreur);
+  zoneAvancement.innerHTML = texte;
+}
+
+const boutons = ['btn-enrichir', 'btn-reessayer', 'btn-ajouter', 'btn-recharger', 'btn-valider-ajout']
+  .map((id) => document.getElementById(id));
+
+function verrouiller(actif) {
+  boutons.forEach((b) => (b.disabled = actif));
+  document.getElementById('icone-enrichir').className = actif ? 'tourne' : '';
+  document.querySelectorAll('[data-relancer]').forEach((b) => (b.disabled = actif));
+}
+
+async function charger() {
+  const rep = await fetch('/api/lignes');
+  const data = await rep.json();
+  if (data.erreur) throw new Error(data.erreur);
+  lignes = data;
+  afficherEntete();
+  rendre();
+}
+
+function resumerBilan(bilan) {
+  const parties = [];
+  if (bilan.enrichi)    parties.push(`<strong>${bilan.enrichi}</strong> complétée${bilan.enrichi > 1 ? 's' : ''}`);
+  if (bilan.non_trouve) parties.push(`<strong>${bilan.non_trouve}</strong> sans source exploitable`);
+  if (bilan.echec)      parties.push(`<strong>${bilan.echec}</strong> en échec`);
+  return parties.length ? parties.join(' · ') : 'aucune ligne à traiter';
+}
+
+/** Appelle un point d'acces d'ecriture, puis recharge l'affichage. */
+async function agir(url, corps, libelle) {
+  verrouiller(true);
+  annoncer(`<span class="tourne">⟳</span> ${libelle} — les appels web prennent quelques secondes par ligne…`);
+  try {
+    const rep = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(corps ?? {}),
+    });
+    const data = await rep.json();
     if (data.erreur) throw new Error(data.erreur);
-    lignes = data;
-    afficherEntete();
-    rendre();
-  })
-  .catch((e) => {
-    document.getElementById('liste').innerHTML =
-      `<div class="message"><div class="grand">⚠️</div>Chargement impossible : ${echapper(e.message)}</div>`;
-  });
+
+    await charger();
+
+    if (data.bilan) annoncer(`Terminé — ${resumerBilan(data.bilan)}.`);
+    else if (data.message) annoncer(data.message);
+    else annoncer(`Terminé — résultat : <strong>${data.resultat ?? 'inconnu'}</strong>.`);
+
+    return data;
+  } catch (e) {
+    annoncer(`Échec : ${echapper(e.message)}`, true);
+    throw e;
+  } finally {
+    verrouiller(false);
+  }
+}
+
+document.getElementById('btn-enrichir').addEventListener('click', () =>
+  agir('/api/enrichir', {}, 'Complétion des champs vides en cours').catch(() => {}));
+
+document.getElementById('btn-reessayer').addEventListener('click', () => {
+  const sansSource = lignes.filter((l) => l.statut === 'non_trouve' || l.statut === 'echec').length;
+  if (!sansSource) return annoncer('Aucune ligne sans source à réessayer.');
+  if (!confirm(`Réessayer les ${sansSource} lignes sans source ? Chacune déclenche une nouvelle recherche web.`)) return;
+  agir('/api/reessayer', {}, 'Nouvelle tentative sur les lignes sans source').catch(() => {});
+});
+
+document.getElementById('btn-recharger').addEventListener('click', async () => {
+  verrouiller(true);
+  try {
+    await charger();
+    annoncer('Affichage rechargé depuis la base.');
+  } catch (e) {
+    annoncer(`Rechargement impossible : ${echapper(e.message)}`, true);
+  } finally {
+    verrouiller(false);
+  }
+});
+
+document.getElementById('btn-ajouter').addEventListener('click', () => {
+  const f = document.getElementById('form-ajout');
+  f.hidden = !f.hidden;
+  if (!f.hidden) document.getElementById('ajout-nom').focus();
+});
+
+document.getElementById('form-ajout').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const nom = document.getElementById('ajout-nom').value.trim();
+  const url = document.getElementById('ajout-url').value.trim();
+  if (!nom && !url) return annoncer('Renseigne au moins un nom ou une adresse.', true);
+
+  try {
+    await agir('/api/ligne', { nom, url }, `Ajout de « ${nom || url} » et complétion`);
+    document.getElementById('ajout-nom').value = '';
+    document.getElementById('ajout-url').value = '';
+    document.getElementById('form-ajout').hidden = true;
+  } catch { /* message deja affiche */ }
+});
+
+// Relance ligne par ligne, par delegation : les cartes sont reconstruites
+// a chaque rendu, un ecouteur global survit a ces reconstructions.
+document.getElementById('liste').addEventListener('click', async (e) => {
+  const bouton = e.target.closest('[data-relancer]');
+  if (!bouton) return;
+
+  const id = bouton.dataset.relancer;
+  const champ = document.querySelector(`[data-champ-url="${id}"]`);
+  const etat = document.querySelector(`[data-etat="${id}"]`);
+  const url = champ.value.trim();
+
+  if (!/^https?:\/\//i.test(url)) {
+    etat.textContent = "L'adresse doit commencer par http:// ou https://";
+    return;
+  }
+
+  etat.innerHTML = '<span class="tourne">⟳</span> Lecture de la page en cours…';
+  try {
+    await agir('/api/ligne/url', { id, url }, 'Complétion depuis la nouvelle adresse');
+  } catch { /* message deja affiche dans le bandeau */ }
+});
+
+charger().catch((e) => {
+  document.getElementById('liste').innerHTML =
+    `<div class="message"><div class="grand">⚠️</div>Chargement impossible : ${echapper(e.message)}</div>`;
+});
 </script>
 </body>
 </html>
