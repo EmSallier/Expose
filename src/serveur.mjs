@@ -13,6 +13,7 @@
 import 'dotenv/config';
 import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
+import { extname, resolve } from 'node:path';
 import { createClient } from '@supabase/supabase-js';
 import { creerRedacteur, traiterLigne } from './enrichissement.mjs';
 import { repondre } from './chat.mjs';
@@ -159,6 +160,43 @@ const serveur = createServer(async (req, rep) => {
             const html = await readFile('public/index.html', 'utf8');
             rep.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
             return rep.end(html);
+        }
+
+        // ---- Fichiers statiques : polices et images du bandeau ----
+        // Liste blanche d'extensions et chemin normalise : une requete
+        // comme /polices/../../.env ne doit pas remonter l'arborescence.
+        if (req.method === 'GET' && /^\/(polices\/|[\w-]+\.(webp|png|svg|ico))/.test(chemin)) {
+            const TYPES = {
+                '.woff2': 'font/woff2',
+                '.webp': 'image/webp',
+                '.png': 'image/png',
+                '.svg': 'image/svg+xml',
+                '.ico': 'image/x-icon',
+            };
+            const ext = extname(chemin).toLowerCase();
+            if (!TYPES[ext]) {
+                rep.writeHead(404).end('Type non servi');
+                return;
+            }
+
+            const racine = resolve('public');
+            const cible = resolve(racine, '.' + chemin);
+            if (!cible.startsWith(racine)) {
+                rep.writeHead(403).end('Chemin refuse');
+                return;
+            }
+
+            try {
+                const contenu = await readFile(cible);
+                rep.writeHead(200, {
+                    'Content-Type': TYPES[ext],
+                    'Cache-Control': 'public, max-age=86400',
+                });
+                return rep.end(contenu);
+            } catch {
+                rep.writeHead(404).end('Fichier introuvable');
+                return;
+            }
         }
 
         // ---- Lecture ----
